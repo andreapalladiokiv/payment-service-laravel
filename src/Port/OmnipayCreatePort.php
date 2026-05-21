@@ -1,0 +1,55 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Techork\PaymentService\Laravel\Port;
+
+use Techork\PaymentService\Common\Contract\Challenge;
+use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
+use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
+use Techork\PaymentService\Domain\PaymentIntent\Port\CreatePort;
+use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
+use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CreateRequest;
+use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
+use Techork\PaymentService\Gateway\Contract\PaymentGatewayInterface;
+use Techork\PaymentService\Gateway\ValueObject\GatewayId;
+
+/**
+ * {@see CreatePort} backed by {@see PaymentGatewayInterface} (Omnipay-style
+ * router). Selects `charge()` for Immediate captureMethod, `authorize()`
+ * otherwise. Persists the gateway reference so subsequent capture / cancel /
+ * refund can locate the transaction. Translates a non-success result into
+ * {@see GatewayDeclinedException} so the aggregate records `PaymentIntentFailed`.
+ */
+final readonly class OmnipayCreatePort implements CreatePort
+{
+    public function __construct(
+        private PaymentGatewayInterface $gateway,
+        private GatewayTransactionRepository $transactionRepository,
+        private GatewayId $gatewayId,
+    ) {}
+
+    public function create(CreateRequest $request): ?Challenge
+    {
+        $clientUniqueId = $request->paymentIntentId->toString();
+        $threeDS = $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null;
+
+        $result = $request->captureMethod === CaptureMethod::Immediate
+            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS)
+            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS);
+
+        if ($result->reference !== null) {
+            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference);
+        }
+
+        if ($result->challenge !== null) {
+            return $result->challenge;
+        }
+
+        if (!$result->success) {
+            throw new GatewayDeclinedException($result->message ?? 'Gateway declined the transaction');
+        }
+
+        return null;
+    }
+}

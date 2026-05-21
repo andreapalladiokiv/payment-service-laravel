@@ -1,0 +1,67 @@
+{
+    "name": "techork/payment-service-laravel",
+    "description": "Laravel bridge for payment gateway \u2014 Eloquent models, repositories, migrations, auto-discovery",
+    "type": "library",
+    "license": "proprietary",
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "git@github.com:andreapalladiokiv/payment-service-common.git"
+        },
+        {
+            "type": "vcs",
+            "url": "git@github.com:andreapalladiokiv/payment-service-domain.git"
+        },
+        {
+            "type": "vcs",
+            "url": "git@github.com:andreapalladiokiv/payment-service-gateway.git"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "giggsey/libphonenumber-for-php": "^9.0",
+        "laravel/framework": "^11.0 || ^12.0 || ^13.0",
+        "nyholm/psr7": "^1.8",
+        "omnipay/common": "^3.0",
+        "spatie/laravel-package-tools": "^1.16",
+        "spatie/laravel-webhook-client": "^3.5",
+        "symfony/property-access": "^7.0",
+        "symfony/property-info": "^7.0",
+        "symfony/psr-http-message-bridge": "^7.0 || ^8.0",
+        "symfony/serializer": "^7.0",
+        "techork/payment-service-common": "@dev",
+        "techork/payment-service-domain": "@dev",
+        "techork/payment-service-gateway": "@dev"
+    },
+    "require-dev": {
+        "mockery/mockery": "^1.6",
+        "pestphp/pest": "^4.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Techork\\PaymentService\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Techork\\PaymentService\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Techork\\PaymentService\\Laravel\\GatewayServiceProvider",
+                "Techork\\PaymentService\\Laravel\\Webhook\\WebhookServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

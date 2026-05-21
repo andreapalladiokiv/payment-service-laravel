@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('gateway_references', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->foreignUuid('gateway_id')
+                ->constrained('gateways')
+                ->cascadeOnDelete();
+            $table->string('referenceable_type');
+            $table->uuid('referenceable_id');
+            $table->string('reference')->nullable();
+            $table->text('failure_reason')->nullable();
+            $table->timestamps();
+
+            $table->unique(['gateway_id', 'referenceable_type', 'referenceable_id'], 'gateway_ref_unique');
+            $table->index(['referenceable_type', 'referenceable_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('gateway_references');
+    }
+};
