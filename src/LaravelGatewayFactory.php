@@ -36,10 +36,21 @@ final class LaravelGatewayFactory extends GatewayFactory
 
         /** @var array<string, mixed> $defaults */
         $defaults = (array) $this->config->get("services.{$credential->getGatewayName()}", []);
+        $applied = false;
         foreach ($defaults as $key => $value) {
             if ($value !== null) {
                 $gateway->setParameter($key, $value);
+                $applied = true;
             }
+        }
+
+        // parent::createForCredential already invoked initialize() with the
+        // credentials, which froze any environment-dependent state (e.g.
+        // ConnexPay's HTTP clients bake the base URL from environment at
+        // initialize() time). Re-initialize with the merged parameter set so
+        // services.{gateway} overrides actually take effect on those clients.
+        if ($applied) {
+            $gateway->initialize($gateway->getParameters());
         }
 
         return $gateway;
