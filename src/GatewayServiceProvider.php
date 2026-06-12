@@ -104,6 +104,7 @@ class GatewayServiceProvider extends PackageServiceProvider
                 'create_gateway_customers_table',
                 'extend_webhook_calls',
                 'add_reference_index_to_gateway_references',
+                'add_metadata_to_gateway_references',
                 'create_shredding_values_table',
             ]);
     }

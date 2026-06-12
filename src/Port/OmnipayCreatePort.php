@@ -39,7 +39,7 @@ final readonly class OmnipayCreatePort implements CreatePort
             : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS);
 
         if ($result->reference !== null) {
-            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference);
+            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
         }
 
         if ($result->challenge !== null) {

@@ -36,7 +36,7 @@ final readonly class OmnipayCapturePort implements CapturePort
         );
 
         if ($result->reference !== null) {
-            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $paymentIntentId, $result->reference);
+            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $paymentIntentId, $result->reference, $result->metadata);
         }
 
         if (!$result->success) {

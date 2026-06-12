@@ -26,9 +26,25 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
         return $this->find(self::TYPE_PAYMENT_INTENT, $paymentIntentId);
     }
 
-    public function saveForPaymentIntent(GatewayId $gatewayId, string $paymentIntentId, string $reference): void
+    public function saveForPaymentIntent(GatewayId $gatewayId, string $paymentIntentId, string $reference, array $metadata = []): void
     {
-        $this->save($gatewayId, self::TYPE_PAYMENT_INTENT, $paymentIntentId, $reference);
+        $this->save($gatewayId, self::TYPE_PAYMENT_INTENT, $paymentIntentId, $reference, $metadata);
+    }
+
+    public function findMetadataForPaymentIntent(string $paymentIntentId): array
+    {
+        $metadata = GatewayReference::query()
+            ->where('referenceable_type', self::TYPE_PAYMENT_INTENT)
+            ->where('referenceable_id', $paymentIntentId)
+            ->value('metadata');
+
+        if ($metadata === null || $metadata === '') {
+            return [];
+        }
+
+        $decoded = json_decode((string) $metadata, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     public function findForRefund(string $refundId): ?string
@@ -49,7 +65,10 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
             ->value('reference');
     }
 
-    private function save(GatewayId $gatewayId, string $referenceableType, string $referenceableId, string $reference): void
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    private function save(GatewayId $gatewayId, string $referenceableType, string $referenceableId, string $reference, array $metadata = []): void
     {
         GatewayReference::unguarded(fn () => GatewayReference::query()->updateOrCreate(
             [
@@ -60,6 +79,11 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
             [
                 'reference' => $reference,
                 'failure_reason' => null,
+                // An empty array means "no signal", not "erase": the auth
+                // response may carry metadata that the capture response
+                // doesn't repeat, so the overwrite-on-transition semantics
+                // apply to the reference only.
+                ...($metadata === [] ? [] : ['metadata' => json_encode($metadata)]),
             ],
         ));
     }
