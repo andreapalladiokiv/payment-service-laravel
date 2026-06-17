@@ -61,7 +61,12 @@ final class EloquentCustomerRepository implements CustomerRepository, PaymentIns
             'customer_reference' => $customerReference,
         ]));
 
-        $reference->customers()->syncWithoutDetaching([$customer->id]);
+        // `sync` (not `syncWithoutDetaching`): the pivot's UNIQUE
+        // `gateway_reference_id` means a reference links to exactly one
+        // customer. Re-pointing it at a different customer must replace the
+        // existing pivot row — `syncWithoutDetaching` would leave the stale row
+        // and attempt a second INSERT, violating the unique constraint.
+        $reference->customers()->sync([$customer->id]);
     }
 
     private function resolveId(PaymentInstrument $instrument): ?UuidValueObject
