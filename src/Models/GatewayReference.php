@@ -29,6 +29,7 @@ class GatewayReference extends Model
 
     protected $casts = [
         'gateway_id' => UuidValueObjectCast::class.':'.GatewayId::class,
+        'metadata' => 'json',
     ];
 
     public function gateway(): BelongsTo
