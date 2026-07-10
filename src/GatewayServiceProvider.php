@@ -73,6 +73,7 @@ use Techork\PaymentService\Laravel\Rules\State;
 use Techork\PaymentService\Laravel\Serializer\ChallengeNormalizer;
 use Techork\PaymentService\Laravel\Serializer\ChallengeResultNormalizer;
 use Techork\PaymentService\Laravel\Serializer\PaymentInstrumentNormalizer;
+use Techork\PaymentService\Laravel\Serializer\PhoneNumberNormalizer;
 use Techork\PaymentService\Laravel\Serializer\PiiAttributeLoader;
 use Techork\PaymentService\Laravel\Serializer\PiiAwareObjectNormalizer;
 use Techork\PaymentService\Laravel\Serializer\UuidNormalizer;
@@ -180,6 +181,7 @@ class GatewayServiceProvider extends PackageServiceProvider
 
             return new Serializer([
                 new UuidNormalizer,
+                new PhoneNumberNormalizer,
                 new BackedEnumNormalizer,
                 new DateTimeNormalizer,
                 new ArrayDenormalizer,
