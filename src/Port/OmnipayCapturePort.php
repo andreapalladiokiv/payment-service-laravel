@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
+use Techork\PaymentService\Domain\PaymentIntent\Port\CaptureOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CapturePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CaptureRequest;
@@ -24,7 +25,7 @@ final readonly class OmnipayCapturePort implements CapturePort
         private GatewayId $gatewayId,
     ) {}
 
-    public function capture(CaptureRequest $request): void
+    public function capture(CaptureRequest $request): CaptureOutcome
     {
         $paymentIntentId = $request->paymentIntentId->toString();
 
@@ -42,5 +43,7 @@ final readonly class OmnipayCapturePort implements CapturePort
         if (!$result->success) {
             throw new GatewayDeclinedException($result->message ?? 'Gateway declined the capture');
         }
+
+        return new CaptureOutcome($result->convertedAmount);
     }
 }

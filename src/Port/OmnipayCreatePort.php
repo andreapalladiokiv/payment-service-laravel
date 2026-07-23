@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
-use Techork\PaymentService\Common\Contract\Challenge;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
 use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
+use Techork\PaymentService\Domain\PaymentIntent\Port\CreateOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CreatePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CreateRequest;
@@ -29,7 +29,7 @@ final readonly class OmnipayCreatePort implements CreatePort
         private GatewayId $gatewayId,
     ) {}
 
-    public function create(CreateRequest $request): ?Challenge
+    public function create(CreateRequest $request): CreateOutcome
     {
         $clientUniqueId = $request->paymentIntentId->toString();
         $threeDS = $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null;
@@ -43,13 +43,13 @@ final readonly class OmnipayCreatePort implements CreatePort
         }
 
         if ($result->challenge !== null) {
-            return $result->challenge;
+            return new CreateOutcome(challenge: $result->challenge);
         }
 
         if (!$result->success) {
             throw new GatewayDeclinedException($result->message ?? 'Gateway declined the transaction');
         }
 
-        return null;
+        return new CreateOutcome(convertedAmount: $result->convertedAmount);
     }
 }
