@@ -19,7 +19,7 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  * @property string $referenceable_id
  * @property string|null $reference
  * @property string|null $failure_reason
- * @property string|null $metadata JSON-encoded gateway-specific transaction attributes
+ * @property array|null $metadata JSON-encoded gateway-specific transaction attributes
  */
 class GatewayReference extends Model
 {
