@@ -45,6 +45,13 @@ final readonly class FraudScreeningCreatePort implements CreatePort
 
     public function create(CreateRequest $request): CreateOutcome
     {
+        // Fraud screening and 3DS step-up apply only to a cardholder-initiated
+        // payment; a merchant-initiated one (recurring / unscheduled) has no
+        // cardholder to complete a challenge, so never force it.
+        if ($request->initiation->isMerchantInitiated()) {
+            return $this->inner->create($request);
+        }
+
         // A completed 3DS authentication already claims the liability shift, so
         // a forced step-up would be redundant — let the charge proceed with it.
         if ($this->hasSuccessfulThreeDS($request->challengeResult)) {

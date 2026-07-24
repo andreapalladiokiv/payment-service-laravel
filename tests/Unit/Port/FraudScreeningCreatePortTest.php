@@ -22,6 +22,7 @@ use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSStatus;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSVersion;
 use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
+use Techork\PaymentService\Domain\PaymentIntent\PaymentInitiation;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CreateOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CreatePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CreateRequest;
@@ -37,8 +38,10 @@ function makeScreeningConnection(): ConnectionContext
     return new ConnectionContext(new IpAddress('203.0.113.7'), 'Mozilla/5.0');
 }
 
-function makeCardCreateRequest(?ChallengeResult $challengeResult = null): CreateRequest
-{
+function makeCardCreateRequest(
+    ?ChallengeResult $challengeResult = null,
+    PaymentInitiation $initiation = PaymentInitiation::CardholderInitiated,
+): CreateRequest {
     return new CreateRequest(
         paymentIntentId: PaymentIntentId::generate(),
         amount: new Money(1000, new Currency('USD')),
@@ -51,6 +54,7 @@ function makeCardCreateRequest(?ChallengeResult $challengeResult = null): Create
         captureMethod: CaptureMethod::Immediate,
         billingAddress: new BillingAddress('Test', 'User', '1 St', 'NYC', new Country('US'), '10001'),
         challengeResult: $challengeResult,
+        initiation: $initiation,
     );
 }
 
@@ -106,6 +110,22 @@ it('skips screening and delegates when a successful 3DS authentication is alread
     );
 
     expect($port->create(makeCardCreateRequest($threeDS)))->toBe($delegated);
+});
+
+it('skips screening and delegates for a merchant-initiated payment', function () {
+    $delegated = new CreateOutcome;
+
+    $inner = Mockery::mock(CreatePort::class);
+    $inner->shouldReceive('create')->once()->andReturn($delegated);
+
+    $risk = Mockery::mock(RiskDecisionPort::class);
+    $risk->shouldNotReceive('decide');
+
+    $port = new FraudScreeningCreatePort($inner, $risk, GatewayId::generate(), makeScreeningConnection());
+
+    $request = makeCardCreateRequest(initiation: PaymentInitiation::MerchantRecurring);
+
+    expect($port->create($request))->toBe($delegated);
 });
 
 it('skips screening and delegates for a non-card instrument', function () {
