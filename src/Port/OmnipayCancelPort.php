@@ -31,7 +31,7 @@ final readonly class OmnipayCancelPort implements CancelPort
         $result = $this->gateway->cancel(
             $this->gatewayId,
             $paymentIntentId,
-            $paymentIntentId.':cancel',
+            "$paymentIntentId:cancel",
         );
 
         if (!$result->success) {

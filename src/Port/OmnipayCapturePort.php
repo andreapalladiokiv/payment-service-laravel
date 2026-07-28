@@ -33,7 +33,7 @@ final readonly class OmnipayCapturePort implements CapturePort
             $this->gatewayId,
             $paymentIntentId,
             $request->amount,
-            $paymentIntentId.':capture',
+            "$paymentIntentId:capture",
         );
 
         if ($result->reference !== null) {
