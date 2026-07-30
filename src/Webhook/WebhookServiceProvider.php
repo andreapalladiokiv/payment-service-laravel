@@ -23,7 +23,6 @@ use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayFailureRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentIntentRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentMethodRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewaySuccessRecorder;
-use Techork\PaymentService\Gateway\Webhook\Recorder\NoOpGatewayPaymentIntentRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\NoOpGatewayPaymentMethodRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\RefundFailureRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\RefundProcessingRecorder;
@@ -73,12 +72,10 @@ final class WebhookServiceProvider extends ServiceProvider
         // override this binding in their own service provider.
         $this->app->bind(GatewayPaymentMethodRecorder::class, NoOpGatewayPaymentMethodRecorder::class);
 
-        // Also no-op by default, for a stronger reason than storage: creating an
-        // intent from `payment_intent.created` means accepting intents the
-        // application never initiated, which only the application can decide.
-        // A no-op default is also what keeps adding the handler from changing
-        // any existing consumer's behaviour.
-        $this->app->bind(GatewayPaymentIntentRecorder::class, NoOpGatewayPaymentIntentRecorder::class);
+        // Creates the aggregate when the reference resolves to nothing. Not a
+        // no-op, because the four recorders below all return NotFound and retry
+        // until something has created it, and nothing else would.
+        $this->app->bind(GatewayPaymentIntentRecorder::class, EloquentPaymentIntentRecorder::class);
 
         $this->app->bind(GatewaySuccessRecorder::class, EloquentPaymentIntentRecorder::class);
         $this->app->bind(GatewayAuthorizationRecorder::class, EloquentPaymentIntentRecorder::class);
