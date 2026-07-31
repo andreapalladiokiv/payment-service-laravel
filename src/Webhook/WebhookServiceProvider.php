@@ -20,7 +20,6 @@ use Techork\PaymentService\Gateway\Webhook\HandlerRegistry;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayAuthorizationRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayCancellationRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayFailureRecorder;
-use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentIntentRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentMethodRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewaySuccessRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\NoOpGatewayPaymentMethodRecorder;
@@ -71,11 +70,6 @@ final class WebhookServiceProvider extends ServiceProvider
         // Default: no-op. Applications with local PaymentMethod storage
         // override this binding in their own service provider.
         $this->app->bind(GatewayPaymentMethodRecorder::class, NoOpGatewayPaymentMethodRecorder::class);
-
-        // Creates the aggregate when the reference resolves to nothing. Not a
-        // no-op, because the four recorders below all return NotFound and retry
-        // until something has created it, and nothing else would.
-        $this->app->bind(GatewayPaymentIntentRecorder::class, EloquentPaymentIntentRecorder::class);
 
         $this->app->bind(GatewaySuccessRecorder::class, EloquentPaymentIntentRecorder::class);
         $this->app->bind(GatewayAuthorizationRecorder::class, EloquentPaymentIntentRecorder::class);

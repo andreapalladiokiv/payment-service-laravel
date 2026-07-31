@@ -6,17 +6,13 @@ namespace Techork\PaymentService\Laravel\Webhook\Service;
 
 use DomainException;
 use Money\Money;
-use Techork\PaymentService\Common\ValueObject\BillingAddress;
 use Techork\PaymentService\Common\ValueObject\Challenge\RedirectResult;
-use Techork\PaymentService\Common\ValueObject\HostedPayment;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSStatus;
-use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
 use Techork\PaymentService\Domain\PaymentIntent\PaymentIntentAggregateRepositoryInterface;
 use Techork\PaymentService\Domain\PaymentIntent\PaymentIntentStatus;
 use Techork\PaymentService\Domain\PaymentIntent\ValueObject\PaymentIntentId;
 use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
-use Techork\PaymentService\Gateway\Webhook\Contract\TransactionIdResolver;
 use Techork\PaymentService\Laravel\Webhook\Service\Command\CancelPaymentIntent;
 use Techork\PaymentService\Laravel\Webhook\Service\Command\CapturePaymentIntent;
 use Techork\PaymentService\Laravel\Webhook\Service\Port\ExternallyCompletedCancelPort;
@@ -25,7 +21,6 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayAuthorizationRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayCancellationRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayFailureRecorder;
-use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentIntentRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewaySuccessRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\RecorderOutcome;
 
@@ -41,72 +36,12 @@ use Techork\PaymentService\Gateway\Webhook\Recorder\RecorderOutcome;
  *     replay onto the aggregate via a no-op port adapter so the event
  *     stream stays the source of truth.
  */
-final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizationRecorder, GatewayCancellationRecorder, GatewayFailureRecorder, GatewayPaymentIntentRecorder, GatewaySuccessRecorder
+final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizationRecorder, GatewayCancellationRecorder, GatewayFailureRecorder, GatewaySuccessRecorder
 {
     public function __construct(
         private PaymentIntentAggregateRepositoryInterface $paymentIntentRepository,
         private GatewayTransactionRepository $transactionRepository,
-        private TransactionIdResolver $transactionIdResolver,
     ) {}
-
-    /**
-     * Opens the aggregate for an intent the gateway has just told us about.
-     *
-     * Imported as {@see PaymentIntentStatus::RequiresAction}, which is not a
-     * stand-in for a missing "created" case — it is the state every other
-     * recorder here already knows how to resolve. `onGatewaySuccess` and
-     * `onGatewayFailure` both branch on `RequiresAction` and finish it through
-     * `confirmChallenge()`, and `cancel()` lists it as cancelable. So an intent
-     * opened here converges the moment its next webhook lands, which is the
-     * whole point: the other recorders return NotFound and retry for exactly as
-     * long as nothing has created the intent.
-     *
-     * The instrument is {@see HostedPayment::unknown()}: Stripe attaches the
-     * payment method at confirmation, so the event that announces an intent
-     * names none, and `PaymentInstrument` is not nullable.
-     */
-    public function onPaymentIntentRecord(
-        GatewayId $gatewayId,
-        string $paymentIntentReference,
-        Money $amount,
-        ?string $paymentMethodReference,
-        ?string $description,
-        ?string $merchantDescriptor,
-    ): RecorderOutcome {
-        // Idempotency, and the case that matters most: our own create call also
-        // makes the gateway announce the intent, so this arrives for intents we
-        // already hold. Resolving the reference is what tells the two apart.
-        if ($this->transactionIdResolver->resolvePaymentIntent($gatewayId, $paymentIntentReference) !== null) {
-            return RecorderOutcome::Skipped;
-        }
-
-        $id = PaymentIntentId::generate();
-        $paymentIntent = $this->paymentIntentRepository->retrieve($id);
-
-        $paymentIntent->import(
-            amount: $amount,
-            status: PaymentIntentStatus::RequiresAction,
-            instrument: HostedPayment::unknown(),
-            // Nothing has been captured and nothing says it will be
-            // automatically. Manual keeps the aggregate from reporting an
-            // authorization it never saw as destined for capture.
-            captureMethod: CaptureMethod::Manual,
-            // Not null, even though the import event would accept it: the charge,
-            // authorize and requires-action events all demand a billing address,
-            // so an intent imported with null could never be resolved by the very
-            // webhooks this exists to unblock.
-            billingAddress: BillingAddress::unknown(),
-        );
-
-        $this->paymentIntentRepository->persist($paymentIntent);
-
-        // Last, so a failure here leaves an intent with no reference — which the
-        // next webhook retries into existence — rather than a reference pointing
-        // at an aggregate that was never persisted.
-        $this->transactionRepository->saveForPaymentIntent($gatewayId, $id->toString(), $paymentIntentReference);
-
-        return RecorderOutcome::Applied;
-    }
 
     public function onGatewaySuccess(
         GatewayId $gatewayId,
