@@ -17,6 +17,7 @@ use Techork\PaymentService\Laravel\Webhook\Service\Command\CancelPaymentIntent;
 use Techork\PaymentService\Laravel\Webhook\Service\Command\CapturePaymentIntent;
 use Techork\PaymentService\Laravel\Webhook\Service\Port\ExternallyCompletedCancelPort;
 use Techork\PaymentService\Laravel\Webhook\Service\Port\ExternallyCompletedCapturePort;
+use Techork\PaymentService\Laravel\Webhook\Service\Port\ExternallyCompletedConfirmChallengePort;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayAuthorizationRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayCancellationRecorder;
@@ -58,7 +59,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
 
         switch ($paymentIntent->status()) {
             case PaymentIntentStatus::RequiresAction:
-                $paymentIntent->confirmChallenge(new RedirectResult($gatewayReference));
+                $paymentIntent->confirmChallenge(new RedirectResult($gatewayReference), new ExternallyCompletedConfirmChallengePort);
                 break;
 
             case PaymentIntentStatus::Authorized:
@@ -101,7 +102,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
             return RecorderOutcome::Skipped;
         }
 
-        $paymentIntent->confirmChallenge(new RedirectResult($gatewayReference));
+        $paymentIntent->confirmChallenge(new RedirectResult($gatewayReference), new ExternallyCompletedConfirmChallengePort);
         $this->paymentIntentRepository->persist($paymentIntent);
 
         if ($gatewayReference !== '') {
@@ -125,7 +126,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
             return RecorderOutcome::Skipped;
         }
 
-        $paymentIntent->confirmChallenge(self::failedThreeDSResult($reason));
+        $paymentIntent->confirmChallenge(self::failedThreeDSResult($reason), new ExternallyCompletedConfirmChallengePort);
         $this->paymentIntentRepository->persist($paymentIntent);
 
         return RecorderOutcome::Applied;
