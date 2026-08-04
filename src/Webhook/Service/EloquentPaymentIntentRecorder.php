@@ -57,9 +57,18 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
             return RecorderOutcome::NotFound;
         }
 
+        // Only the capture branch still has to keep the reference itself: its port
+        // records a state change the gateway already made and stores nothing, whereas
+        // the confirm branch hands the reference to a port that persists it. Saving in
+        // both would write the same row twice.
+        $referenceIsOursToKeep = false;
+
         switch ($paymentIntent->status()) {
             case PaymentIntentStatus::RequiresAction:
-                $paymentIntent->confirmChallenge(new RedirectResult($gatewayReference), new ExternallyCompletedConfirmChallengePort);
+                $paymentIntent->confirmChallenge(
+                    new RedirectResult($gatewayReference),
+                    ExternallyCompletedConfirmChallengePort::announcing($this->transactionRepository, $gatewayId, $gatewayReference),
+                );
                 break;
 
             case PaymentIntentStatus::Authorized:
@@ -70,6 +79,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
                     // already captured, but the aggregate refuses to record it.
                     return RecorderOutcome::Skipped;
                 }
+                $referenceIsOursToKeep = true;
                 break;
 
             default:
@@ -78,7 +88,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
 
         $this->paymentIntentRepository->persist($paymentIntent);
 
-        if ($gatewayReference !== '') {
+        if ($referenceIsOursToKeep && $gatewayReference !== '') {
             $this->transactionRepository->saveForPaymentIntent($gatewayId, $paymentIntentId, $gatewayReference);
         }
 
@@ -102,12 +112,12 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
             return RecorderOutcome::Skipped;
         }
 
-        $paymentIntent->confirmChallenge(new RedirectResult($gatewayReference), new ExternallyCompletedConfirmChallengePort);
+        // The port keeps the reference; nothing left to save here.
+        $paymentIntent->confirmChallenge(
+            new RedirectResult($gatewayReference),
+            ExternallyCompletedConfirmChallengePort::announcing($this->transactionRepository, $gatewayId, $gatewayReference),
+        );
         $this->paymentIntentRepository->persist($paymentIntent);
-
-        if ($gatewayReference !== '') {
-            $this->transactionRepository->saveForPaymentIntent($gatewayId, $paymentIntentId, $gatewayReference);
-        }
 
         return RecorderOutcome::Applied;
     }
@@ -126,7 +136,9 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
             return RecorderOutcome::Skipped;
         }
 
-        $paymentIntent->confirmChallenge(self::failedThreeDSResult($reason), new ExternallyCompletedConfirmChallengePort);
+        // No gateway data to carry, and none needed: a failed result is recorded before
+        // any port is reached.
+        $paymentIntent->confirmChallenge(self::failedThreeDSResult($reason), ExternallyCompletedConfirmChallengePort::reportingRefusalOnly());
         $this->paymentIntentRepository->persist($paymentIntent);
 
         return RecorderOutcome::Applied;
