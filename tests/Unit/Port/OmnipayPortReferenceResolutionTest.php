@@ -117,3 +117,31 @@ it('stops reporting a missing reference as an issuer refusing a cancellation', f
         ->and($thrown)->not->toBeInstanceOf(GatewayDeclinedException::class)
         ->and($thrown->getMessage())->toContain('No gateway transaction reference recorded');
 });
+
+it('forwards the hold and the instrument, without which ConnexPay takes the full amount', function () {
+    // The two arguments PaymentGatewayInterface::capture has always accepted and this
+    // port never passed. ConnexPayGateway::capture reads them to notice that a partial
+    // capture was asked for and to build the void-and-resell its provider requires;
+    // its own docblock says that without them "the full hold would be captured
+    // silently". The branch had tests. Nothing reached it.
+    $seen = [];
+
+    $gateway = Mockery::mock(PaymentGatewayInterface::class);
+    $gateway->shouldReceive('capture')->once()->andReturnUsing(function (...$args) use (&$seen) {
+        $seen = $args;
+
+        return GatewayResult::succeeded('cap_1');
+    });
+
+    $authorized = new Money(1000, new Currency('USD'));
+    $partial = new Money(300, new Currency('USD'));
+    $instrument = Mockery::mock(PaymentInstrument::class);
+
+    (new OmnipayCapturePort($gateway, referenceRepo('auth_ref'), GatewayId::generate()))
+        ->capture(new CaptureRequest(PaymentIntentId::generate(), $partial, $authorized, $instrument));
+
+    // (gatewayId, reference, amount, clientUniqueId, authorizedAmount, instrument)
+    expect($seen[2])->toBe($partial)
+        ->and($seen[4])->toBe($authorized)
+        ->and($seen[5])->toBe($instrument);
+});

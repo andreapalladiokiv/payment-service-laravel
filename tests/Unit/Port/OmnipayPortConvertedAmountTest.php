@@ -83,6 +83,8 @@ it('carries the FX convertedAmount from a capture result into the CaptureOutcome
     $outcome = $port->capture(new CaptureRequest(
         paymentIntentId: PaymentIntentId::generate(),
         amount: new Money(8000, new Currency('EUR')),
+        authorizedAmount: new Money(8000, new Currency('EUR')),
+        instrument: Mockery::mock(PaymentInstrument::class),
     ));
 
     expect($outcome->convertedAmount)->toBe($converted);

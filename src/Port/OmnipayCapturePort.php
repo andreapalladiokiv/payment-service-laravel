@@ -47,6 +47,8 @@ final readonly class OmnipayCapturePort implements CapturePort
             $transactionReference,
             $request->amount,
             "$paymentIntentId:capture",
+            $request->authorizedAmount,
+            $request->instrument,
         );
 
         if ($result->reference !== null) {
