@@ -42,9 +42,14 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  *    and is refused as one.
  *
  * The genesis crosses from domain identity to acquirer reference here and nowhere
- * earlier, through the same lookup capture, cancel and refund already use — so the
- * promise on `CreatePaymentIntentCommand::gatewayId()`, that the domain "learns
- * nothing about the gateway itself", still holds.
+ * earlier — so the promise on `CreatePaymentIntentCommand::gatewayId()`, that the
+ * domain "learns nothing about the gateway itself", still holds.
+ *
+ * Not through the same lookup capture and refund use, though. Those read `reference`,
+ * which overwrites on transition and by renewal time holds the genesis's settle id —
+ * the one value this field must not carry. The anchor comes from the transaction
+ * metadata instead, where the gateway layer records the reference of whichever
+ * transaction OPENED the intent.
  */
 final readonly class OmnipayRebillingCreatePort implements CreatePort
 {
