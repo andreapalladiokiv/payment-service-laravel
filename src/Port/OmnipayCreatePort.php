@@ -34,14 +34,23 @@ final readonly class OmnipayCreatePort implements CreatePort
         $clientUniqueId = $request->paymentIntentId->toString();
         $threeDS = $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null;
 
+        // The domain names the genesis by its own id; the reference the acquirer
+        // wants is gateway-side, and this is where the two meet. Same lookup
+        // capture, cancel and refund already use, so a genesis whose reference was
+        // never stored resolves to null and the adapter omits the field — rather
+        // than sending an id the acquirer would refuse.
+        $storedCredentialReference = $request->genesisPaymentIntentId === null
+            ? null
+            : $this->transactionRepository->findForPaymentIntent($request->genesisPaymentIntentId->toString());
+
         // The initiation travels all the way through. Dropping it here — which is
         // what happened until the indicator existed on the wire — submits a
         // subscription renewal as though the cardholder were sitting there, which
         // is both a false SCA-exemption claim and, on the acquirers that branch on
         // it, a different transaction than the one the domain described.
         $result = $request->captureMethod === CaptureMethod::Immediate
-            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation)
-            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation);
+            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation, storedCredentialReference: $storedCredentialReference)
+            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation, storedCredentialReference: $storedCredentialReference);
 
         if ($result->reference !== null) {
             $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
