@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
+use RuntimeException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Refund\Port\RefundPort;
 use Techork\PaymentService\Domain\PaymentIntent\Refund\Port\Request\RefundRequest;
@@ -30,9 +31,12 @@ final readonly class OmnipayRefundPort implements RefundPort
         $paymentIntentId = $request->paymentIntentId->toString();
         $refundId = $request->refundId->toString();
 
+        $transactionReference = $this->transactionRepository->findForPaymentIntent($paymentIntentId)
+            ?? throw new RuntimeException("No gateway transaction reference recorded for payment intent '$paymentIntentId'.");
+
         $result = $this->gateway->refund(
             $this->gatewayId,
-            $paymentIntentId,
+            $transactionReference,
             $request->amount,
             $refundId,
             $request->retryInstrument,

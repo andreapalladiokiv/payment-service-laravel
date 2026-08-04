@@ -35,8 +35,8 @@ final readonly class OmnipayCreatePort implements CreatePort
         $threeDS = $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null;
 
         $result = $request->captureMethod === CaptureMethod::Immediate
-            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS)
-            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS);
+            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation)
+            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation);
 
         if ($result->reference !== null) {
             $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);

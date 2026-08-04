@@ -73,6 +73,9 @@ it('carries the FX convertedAmount from a capture result into the CaptureOutcome
     );
 
     $txRepo = Mockery::mock(GatewayTransactionRepository::class);
+    // The port resolves the reference now — the gateway no longer reaches into our
+    // storage for it.
+    $txRepo->shouldReceive('findForPaymentIntent')->once()->andReturn('auth_ref');
     $txRepo->shouldReceive('saveForPaymentIntent')->once();
 
     $port = new OmnipayCapturePort($gateway, $txRepo, GatewayId::generate());

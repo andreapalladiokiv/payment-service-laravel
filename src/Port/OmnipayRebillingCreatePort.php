@@ -10,13 +10,14 @@ use Techork\PaymentService\Domain\PaymentIntent\Port\CreateOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CreatePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CreateRequest;
+use Techork\PaymentService\Domain\PaymentIntent\ValueObject\PaymentIntentId;
 use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
 use Techork\PaymentService\Gateway\Contract\PaymentGatewayInterface;
 use Techork\PaymentService\Gateway\Exception\UnsupportedOperation;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 
 /**
- * {@see CreatePort} for a payment that belongs to a stored-credential series — a
+ * {@see CreatePort} for a payment that belongs to a rebilling series — a
  * subscription's first charge, or any of its renewals.
  *
  * The same interface as {@see OmnipayCreatePort} and a different implementation,
@@ -45,12 +46,13 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  * promise on `CreatePaymentIntentCommand::gatewayId()`, that the domain "learns
  * nothing about the gateway itself", still holds.
  */
-final readonly class OmnipayStoredCredentialCreatePort implements CreatePort
+final readonly class OmnipayRebillingCreatePort implements CreatePort
 {
     public function __construct(
         private PaymentGatewayInterface $gateway,
         private GatewayTransactionRepository $transactionRepository,
         private GatewayId $gatewayId,
+        private ?PaymentIntentId $genesisPaymentIntentId,
     ) {}
 
     public function create(CreateRequest $request): CreateOutcome
@@ -61,23 +63,26 @@ final readonly class OmnipayStoredCredentialCreatePort implements CreatePort
             // for it. Refuse before spending the call, and refuse as a wiring error
             // so it cannot be read as an issuer saying no.
             throw UnsupportedOperation::forGateway(
-                'stored-credential series',
-                'authorizeStoredCredential',
+                $this->gatewayId->toString(),
+                'authorizeRebilling',
                 'a payment in a series is authorized and captured separately, so Immediate capture cannot be used.',
             );
         }
 
         $clientUniqueId = $request->paymentIntentId->toString();
 
-        // Null resolves to null, and that is meaningful here rather than a gap: this
-        // payment opens the series. A genesis that was named but whose reference was
-        // never stored also lands here, and passing nothing beats passing an id the
-        // acquirer has never seen — which it would refuse, as a decline.
-        $genesisReference = $request->genesisPaymentIntentId === null
+        // Nullable but not optional: opening a series is stated by passing null, not
+        // by leaving an argument out, so no caller can mean it by accident.
+        //
+        // No genesis means no lookup — there is nothing before this payment to look
+        // for. A genesis that WAS named but whose reference was never stored lands on
+        // null too, and passing nothing beats passing an id the acquirer has never
+        // seen, which it would refuse as a decline.
+        $genesisReference = $this->genesisPaymentIntentId === null
             ? null
-            : $this->transactionRepository->findForPaymentIntent($request->genesisPaymentIntentId->toString());
+            : $this->transactionRepository->findForPaymentIntent($this->genesisPaymentIntentId->toString());
 
-        $result = $this->gateway->authorizeStoredCredential(
+        $result = $this->gateway->authorizeRebilling(
             $this->gatewayId,
             $request->instrument,
             $request->amount,

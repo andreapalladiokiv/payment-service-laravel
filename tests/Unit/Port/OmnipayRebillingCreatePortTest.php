@@ -16,16 +16,23 @@ use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
 use Techork\PaymentService\Gateway\Contract\PaymentGatewayInterface;
 use Techork\PaymentService\Gateway\Exception\UnsupportedByGateway;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
-use Techork\PaymentService\Laravel\Port\OmnipayStoredCredentialCreatePort;
+use Techork\PaymentService\Laravel\Port\OmnipayRebillingCreatePort;
 
 /**
+ * The genesis is held by the PORT, not carried in the request: the caller builds this
+ * port per payment (`new OmnipayRebillingCreatePort(...)` at the call site, never
+ * resolved from a container), and it is the only party that knows the series. So the
+ * domain contract stays untouched.
+ *
+ * Nullable but not optional — opening a series is stated by passing null, so no
+ * caller can mean it by leaving an argument out.
+ *
  * The same CreatePort interface as OmnipayCreatePort, a different implementation.
  * Which one the caller is given IS the scenario: nothing in the request separates a
  * subscription's first charge from a standalone checkout, since both are
  * cardholder-initiated with nothing before them.
  */
 function seriesRequest(
-    ?PaymentIntentId $genesis = null,
     PaymentInitiation $initiation = PaymentInitiation::MerchantRecurring,
     CaptureMethod $captureMethod = CaptureMethod::Manual,
 ): CreateRequest {
@@ -36,17 +43,16 @@ function seriesRequest(
         captureMethod: $captureMethod,
         billingAddress: new BillingAddress('Test', 'User', '1 St', 'NYC', new Country('US'), '10001'),
         initiation: $initiation,
-        genesisPaymentIntentId: $genesis,
     );
 }
 
-/** @return array{0: OmnipayStoredCredentialCreatePort, 1: callable(): array} */
-function seriesPort(?string $storedReference, ?PaymentIntentId $expectLookup): array
+/** @return array{0: OmnipayRebillingCreatePort, 1: callable(): array} */
+function seriesPort(?string $storedReference, ?PaymentIntentId $genesis): array
 {
     $seen = [];
 
     $gateway = Mockery::mock(PaymentGatewayInterface::class);
-    $gateway->shouldReceive('authorizeStoredCredential')->once()
+    $gateway->shouldReceive('authorizeRebilling')->once()
         ->andReturnUsing(function (...$args) use (&$seen) {
             $seen = $args;
 
@@ -59,38 +65,37 @@ function seriesPort(?string $storedReference, ?PaymentIntentId $expectLookup): a
     $txRepo = Mockery::mock(GatewayTransactionRepository::class);
     $txRepo->shouldReceive('saveForPaymentIntent')->zeroOrMoreTimes();
 
-    if ($expectLookup === null) {
+    if ($genesis === null) {
         $txRepo->shouldReceive('findForPaymentIntent')->never();
     } else {
         $txRepo->shouldReceive('findForPaymentIntent')->once()
-            ->with($expectLookup->toString())->andReturn($storedReference);
+            ->with($genesis->toString())->andReturn($storedReference);
     }
 
     return [
-        new OmnipayStoredCredentialCreatePort($gateway, $txRepo, GatewayId::generate()),
+        new OmnipayRebillingCreatePort($gateway, $txRepo, GatewayId::generate(), $genesis),
         // A regular closure, not an arrow fn: those capture by value.
         static function () use (&$seen): array { return $seen; },
     ];
 }
 
 it('resolves the genesis payment intent to the reference the acquirer wants', function () {
-    $genesis = PaymentIntentId::generate();
-    [$port, $seen] = seriesPort('1110000000123456', $genesis);
+    [$port, $seen] = seriesPort('1110000000123456', PaymentIntentId::generate());
 
-    $port->create(seriesRequest($genesis));
+    $port->create(seriesRequest());
 
     // (gatewayId, instrument, amount, initiation, genesisReference, ...)
     expect($seen()[4])->toBe('1110000000123456')
         ->and($seen()[3])->toBe(PaymentInitiation::MerchantRecurring);
 });
 
-it('asks for no reference when this payment opens the series', function (PaymentInitiation $initiation) {
+it('asks for no reference when null was passed to say this payment opens the series', function (PaymentInitiation $initiation) {
     // Absent genesis is meaningful here rather than a gap — inside a series it says
     // nothing precedes this payment. That is exactly what the same absence could not
     // mean on the ordinary path, where it also meant "no series at all".
     [$port, $seen] = seriesPort(null, null);
 
-    $port->create(seriesRequest(null, $initiation));
+    $port->create(seriesRequest($initiation));
 
     expect($seen()[4])->toBeNull();
 })->with([
@@ -99,10 +104,9 @@ it('asks for no reference when this payment opens the series', function (Payment
 ]);
 
 it('passes nothing rather than an id the acquirer never saw, when the genesis has no reference', function () {
-    $genesis = PaymentIntentId::generate();
-    [$port, $seen] = seriesPort(null, $genesis);
+    [$port, $seen] = seriesPort(null, PaymentIntentId::generate());
 
-    $port->create(seriesRequest($genesis));
+    $port->create(seriesRequest());
 
     expect($seen()[4])->toBeNull();
 });
@@ -113,11 +117,11 @@ it('refuses Immediate capture as a wiring error, not as a decline', function () 
     // true. Immediate would record Charged and fail that check — after the acquirer
     // had already taken the money.
     $gateway = Mockery::mock(PaymentGatewayInterface::class);
-    $gateway->shouldReceive('authorizeStoredCredential')->never();
+    $gateway->shouldReceive('authorizeRebilling')->never();
 
     $txRepo = Mockery::mock(GatewayTransactionRepository::class);
 
-    $port = new OmnipayStoredCredentialCreatePort($gateway, $txRepo, GatewayId::generate());
+    $port = new OmnipayRebillingCreatePort($gateway, $txRepo, GatewayId::generate(), null);
 
     $thrown = null;
 
