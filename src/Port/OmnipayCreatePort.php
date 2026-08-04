@@ -34,9 +34,14 @@ final readonly class OmnipayCreatePort implements CreatePort
         $clientUniqueId = $request->paymentIntentId->toString();
         $threeDS = $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null;
 
+        // The initiation travels all the way through. Dropping it here — which is
+        // what happened until the indicator existed on the wire — submits a
+        // subscription renewal as though the cardholder were sitting there, which
+        // is both a false SCA-exemption claim and, on the acquirers that branch on
+        // it, a different transaction than the one the domain described.
         $result = $request->captureMethod === CaptureMethod::Immediate
-            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS)
-            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS);
+            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation)
+            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation);
 
         if ($result->reference !== null) {
             $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
