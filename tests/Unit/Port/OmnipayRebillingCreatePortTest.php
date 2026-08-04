@@ -16,6 +16,7 @@ use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
 use Techork\PaymentService\Gateway\Contract\PaymentGatewayInterface;
 use Techork\PaymentService\Gateway\Exception\UnsupportedByGateway;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
+use Techork\PaymentService\Laravel\Port\GatewayReferenceMetadata;
 use Techork\PaymentService\Laravel\Port\OmnipayRebillingCreatePort;
 
 /**
@@ -66,10 +67,15 @@ function seriesPort(?string $storedReference, ?PaymentIntentId $genesis): array
     $txRepo->shouldReceive('saveForPaymentIntent')->zeroOrMoreTimes();
 
     if ($genesis === null) {
-        $txRepo->shouldReceive('findForPaymentIntent')->never();
+        $txRepo->shouldReceive('findMetadataForPaymentIntent')->never();
     } else {
-        $txRepo->shouldReceive('findForPaymentIntent')->once()
-            ->with($genesis->toString())->andReturn($storedReference);
+        // The OPENING reference, not `reference`: by renewal time the latter holds the
+        // genesis's settle id, which is the one value Nuvei rules out for this field.
+        $txRepo->shouldReceive('findMetadataForPaymentIntent')->once()
+            ->with($genesis->toString())
+            ->andReturn($storedReference === null
+                ? []
+                : [GatewayReferenceMetadata::OPENING_REFERENCE => $storedReference]);
     }
 
     return [
@@ -103,7 +109,10 @@ it('asks for no reference when null was passed to say this payment opens the ser
     PaymentInitiation::MerchantUnscheduled,
 ]);
 
-it('passes nothing rather than an id the acquirer never saw, when the genesis has no reference', function () {
+it('passes nothing rather than the settle id, when no opening reference was recorded', function () {
+    // Pre-existing subscriptions land here: activated before the opening reference was
+    // kept, so all storage has is the settle id — the one value this field must not
+    // carry. Sending nothing degrades to a renewal declared rebilling with no anchor.
     [$port, $seen] = seriesPort(null, PaymentIntentId::generate());
 
     $port->create(seriesRequest());

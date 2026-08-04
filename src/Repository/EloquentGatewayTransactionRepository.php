@@ -33,18 +33,7 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
 
     public function findMetadataForPaymentIntent(string $paymentIntentId): array
     {
-        $metadata = GatewayReference::query()
-            ->where('referenceable_type', self::TYPE_PAYMENT_INTENT)
-            ->where('referenceable_id', $paymentIntentId)
-            ->value('metadata');
-
-        if ($metadata === null || $metadata === '') {
-            return [];
-        }
-
-        $decoded = json_decode((string) $metadata, true);
-
-        return is_array($decoded) ? $decoded : [];
+        return $this->findMetadata(self::TYPE_PAYMENT_INTENT, $paymentIntentId);
     }
 
     public function findForRefund(string $refundId): ?string
@@ -70,6 +59,16 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
      */
     private function save(GatewayId $gatewayId, string $referenceableType, string $referenceableId, string $reference, array $metadata = []): void
     {
+        // MERGED, not replaced. An empty array means "no signal", not "erase" —
+        // overwrite-on-transition applies to the reference only — and replacing the
+        // whole bag honoured that just as long as the later response happened to
+        // carry nothing. The moment a capture returns metadata of its own (ConnexPay
+        // returns its incoming transaction code there) everything the authorization
+        // recorded was dropped, which is the opposite of what the rule above says.
+        // Same-key writes still win, so a value the later response does repeat is
+        // updated rather than pinned.
+        $existing = $metadata === [] ? [] : $this->findMetadata($referenceableType, $referenceableId);
+
         GatewayReference::unguarded(fn () => GatewayReference::query()->updateOrCreate(
             [
                 'gateway_id' => $gatewayId->toString(),
@@ -79,12 +78,25 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
             [
                 'reference' => $reference,
                 'failure_reason' => null,
-                // An empty array means "no signal", not "erase": the auth
-                // response may carry metadata that the capture response
-                // doesn't repeat, so the overwrite-on-transition semantics
-                // apply to the reference only.
-                ...($metadata === [] ? [] : ['metadata' => json_encode($metadata)]),
+                ...($metadata === [] ? [] : ['metadata' => json_encode([...$existing, ...$metadata])]),
             ],
         ));
+    }
+
+    /** @return array<string, mixed> */
+    private function findMetadata(string $referenceableType, string $referenceableId): array
+    {
+        $metadata = GatewayReference::query()
+            ->where('referenceable_type', $referenceableType)
+            ->where('referenceable_id', $referenceableId)
+            ->value('metadata');
+
+        if ($metadata === null || $metadata === '') {
+            return [];
+        }
+
+        $decoded = json_decode((string) $metadata, true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 }

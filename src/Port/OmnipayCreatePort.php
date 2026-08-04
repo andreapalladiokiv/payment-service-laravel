@@ -39,7 +39,15 @@ final readonly class OmnipayCreatePort implements CreatePort
             : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation);
 
         if ($result->reference !== null) {
-            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
+        // Recorded beside the reference, not instead of it: a capture will overwrite
+        // `reference` with the settle id, and the transaction that OPENED this intent
+        // is what a later rebilling payment has to name as its anchor.
+            $this->transactionRepository->saveForPaymentIntent(
+                $this->gatewayId,
+                $clientUniqueId,
+                $result->reference,
+                [...$result->metadata, GatewayReferenceMetadata::OPENING_REFERENCE => $result->reference],
+            );
         }
 
         if ($result->challenge !== null) {

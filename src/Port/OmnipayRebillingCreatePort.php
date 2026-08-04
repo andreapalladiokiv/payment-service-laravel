@@ -74,13 +74,17 @@ final readonly class OmnipayRebillingCreatePort implements CreatePort
         // Nullable but not optional: opening a series is stated by passing null, not
         // by leaving an argument out, so no caller can mean it by accident.
         //
-        // No genesis means no lookup — there is nothing before this payment to look
-        // for. A genesis that WAS named but whose reference was never stored lands on
-        // null too, and passing nothing beats passing an id the acquirer has never
-        // seen, which it would refuse as a decline.
+        // Read from the OPENING reference rather than from `reference`, which by now
+        // holds the genesis's settle id — "not from the settle flow" is exactly what
+        // Nuvei says about this field. And no falling back to `reference` when the
+        // opening one was never recorded: storage cannot tell a genesis charged
+        // outright (where `reference` would be right) from one that was authorized and
+        // captured (where it is the forbidden value), so an unknown anchor is sent as
+        // no anchor. That degrades to a renewal declared rebilling without a
+        // reference — a case already handled — instead of a confidently wrong id.
         $genesisReference = $this->genesisPaymentIntentId === null
             ? null
-            : $this->transactionRepository->findForPaymentIntent($this->genesisPaymentIntentId->toString());
+            : $this->transactionRepository->findMetadataForPaymentIntent($this->genesisPaymentIntentId->toString())[GatewayReferenceMetadata::OPENING_REFERENCE] ?? null;
 
         $result = $this->gateway->authorizeRebilling(
             $this->gatewayId,
@@ -94,7 +98,15 @@ final readonly class OmnipayRebillingCreatePort implements CreatePort
         );
 
         if ($result->reference !== null) {
-            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
+        // Recorded for the same reason a one-off records it: this authorization may
+        // itself become the anchor of the renewals that follow, and its reference will
+        // be overwritten by its own capture.
+            $this->transactionRepository->saveForPaymentIntent(
+                $this->gatewayId,
+                $clientUniqueId,
+                $result->reference,
+                [...$result->metadata, GatewayReferenceMetadata::OPENING_REFERENCE => $result->reference],
+            );
         }
 
         if ($result->challenge !== null) {
