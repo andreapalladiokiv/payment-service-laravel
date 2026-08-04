@@ -21,8 +21,10 @@ use Illuminate\Validation\InvokableValidationRule;
 use Omnipay\Omnipay;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
+use RuntimeException;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\Serializer\Mapping\Loader\AttributeLoader;
@@ -37,6 +39,9 @@ use Techork\PaymentService\Common\Contract\EncryptInterface;
 use Techork\PaymentService\Domain\Checkout\CheckoutAggregateRepositoryInterface;
 use Techork\PaymentService\Domain\PaymentIntent\PaymentIntentAggregateRepositoryInterface;
 use Techork\PaymentService\Domain\Subscription\SubscriptionAggregateRepositoryInterface;
+use Techork\PaymentService\Firewall\Dsl\FactSchema;
+use Techork\PaymentService\Firewall\Dsl\RuleCompiler;
+use Techork\PaymentService\Firewall\Dsl\RuleEvaluator;
 use Techork\PaymentService\Gateway\Contract\CustomerRepository;
 use Techork\PaymentService\Gateway\Contract\Gateway;
 use Techork\PaymentService\Gateway\Contract\GatewayCredentialRepository;
@@ -226,10 +231,101 @@ class GatewayServiceProvider extends PackageServiceProvider
 
         $this->registerAggregateRepositories();
 
+        $this->registerFirewall($this->app->make(PackageManifest::class));
+
         $this->app->resolving(
             EncrypterAwareInterface::class,
             fn (EncrypterAwareInterface $instance, Application $app) => $instance->setEncrypter($app[EncryptInterface::class]),
         );
+    }
+
+    /**
+     * The rule DSL, wired with a parse cache.
+     *
+     * Discovered rather than assumed: a package declares its fact vocabulary in
+     * `extra.laravel.firewall`, exactly as gateways and webhook subscribers
+     * declare theirs. An empty section means the firewall package is not
+     * installed, and nothing is registered — the manifest answers that question
+     * properly, where a `class_exists` probe would only guess at it from the
+     * autoloader.
+     *
+     * Only what the foundation can decide is bound. A working chain also needs a
+     * `FirewallRuleSource` and `EnrichmentSuppliers`, and both belong to the
+     * application — it owns the rules table, their ordering, and which risk
+     * providers take part. Bind those two and `PaymentIntentFirewall` resolves on
+     * its own.
+     *
+     * THE POOL IS THE POINT. Every evaluation hands ExpressionLanguage a compiled
+     * string it must lex and parse, and on a chain of any size that dwarfs the
+     * cost of evaluating the result. Symfony keys the parsed tree by expression
+     * text, so a pool that outlives the request turns per-request parsing into
+     * per-deploy parsing — measured at roughly a twentyfold saving on a chain of
+     * twenty rules.
+     *
+     * The pool is deliberately a private filesystem one and NOT the application's
+     * configured cache store. ExpressionLanguage looks up one key per expression
+     * and has no multi-get, so N rules is N round trips; against the Redis store a
+     * typical app configures, that costs more per payment than the parsing it was
+     * meant to save. Override `firewall.parse_cache` only with another local pool.
+     */
+    private function registerFirewall(PackageManifest $manifest): void
+    {
+        $schema = $this->app['config']->get('gateway.firewall.schema')
+            ?? self::discoverFactSchema($manifest);
+
+        if ($schema === null) {
+            return;
+        }
+
+        $this->app->singleton('firewall.parse_cache', fn (Application $app) => new FilesystemAdapter(
+            namespace: 'firewall-rules',
+            defaultLifetime: 0,
+            directory: $app['config']->get('gateway.firewall.cache_path')
+                ?? $app->storagePath('framework/cache/firewall'),
+        ));
+
+        $this->app->singleton(FactSchema::class, $schema);
+
+        $this->app->singleton(RuleEvaluator::class, function (Application $app) {
+            $schema = $app[FactSchema::class];
+
+            return new RuleEvaluator(new RuleCompiler($schema), $schema, $app['firewall.parse_cache']);
+        });
+    }
+
+    /**
+     * Reads `extra.laravel.firewall` from the manifest of every installed
+     * package, keeping entries that are real {@see FactSchema} classes.
+     *
+     * A chain has exactly one vocabulary, so two schemas is an unresolvable
+     * ambiguity in configuration rather than a runtime condition — and picking
+     * one silently would evaluate every rule against the wrong fact roots,
+     * rejecting them at authoring time or, worse, quietly not matching. It throws
+     * instead; `gateway.firewall.schema` is the way to settle it.
+     *
+     * @return class-string<FactSchema>|null
+     */
+    private static function discoverFactSchema(PackageManifest $manifest): ?string
+    {
+        // Deduplicated because the foundation declares the schema and so does the
+        // split firewall package; the two are mutually exclusive via `replace`,
+        // but a partial install should not read as an ambiguity.
+        $schemas = array_values(array_unique(array_filter(
+            $manifest->config('firewall'),
+            static fn ($class): bool => is_string($class)
+                && class_exists($class)
+                && is_a($class, FactSchema::class, true),
+        )));
+
+        if (count($schemas) > 1) {
+            throw new RuntimeException(sprintf(
+                'Several firewall fact schemas were discovered (%s). A chain has one vocabulary; '
+                .'set gateway.firewall.schema to choose which.',
+                implode(', ', $schemas),
+            ));
+        }
+
+        return $schemas[0] ?? null;
     }
 
     private function registerAggregateRepositories(): void
