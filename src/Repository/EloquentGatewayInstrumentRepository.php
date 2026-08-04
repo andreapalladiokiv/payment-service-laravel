@@ -52,6 +52,61 @@ final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepo
         );
     }
 
+    /**
+     * Kept in the existing `metadata` JSON rather than earning a column: it is
+     * one more gateway-specific attribute of the same row, which is what that
+     * column is for, and the typed interface keeps the key from becoming a
+     * contract callers have to know.
+     */
+    private const string STORED_CREDENTIAL_KEY = 'stored_credential_reference';
+
+    public function findStoredCredentialReference(GatewayId $gatewayId, PaymentInstrument $instrument): ?string
+    {
+        $id = $this->resolveId($instrument);
+
+        if ($id === null) {
+            return null;
+        }
+
+        $metadata = GatewayReference::query()
+            ->where('gateway_id', $gatewayId->toString())
+            ->where('referenceable_type', $instrument::type())
+            ->where('referenceable_id', $id)
+            ->value('metadata');
+
+        $reference = is_array($metadata) ? ($metadata[self::STORED_CREDENTIAL_KEY] ?? null) : null;
+
+        return is_string($reference) && $reference !== '' ? $reference : null;
+    }
+
+    public function saveStoredCredentialReference(GatewayId $gatewayId, PaymentInstrument $instrument, string $reference): void
+    {
+        $id = $this->resolveId($instrument);
+
+        // Read-modify-write rather than upsert: the column carries whatever else a
+        // gateway has attached to this instrument, and replacing the whole JSON
+        // would drop it.
+        $row = GatewayReference::query()
+            ->where('gateway_id', $gatewayId->toString())
+            ->where('referenceable_type', $instrument::type())
+            ->where('referenceable_id', $id)
+            ->first();
+
+        $metadata = is_array($row?->metadata) ? $row->metadata : [];
+        $metadata[self::STORED_CREDENTIAL_KEY] = $reference;
+
+        GatewayReference::query()->upsert(
+            [
+                'gateway_id' => $gatewayId->toString(),
+                'referenceable_type' => $instrument::type(),
+                'referenceable_id' => $id,
+                'metadata' => json_encode($metadata),
+            ],
+            ['gateway_id', 'referenceable_type', 'referenceable_id'],
+            ['metadata'],
+        );
+    }
+
     public function saveFailure(GatewayId $gatewayId, PaymentInstrument $instrument, string $reason): void
     {
         $id = $this->resolveId($instrument);
