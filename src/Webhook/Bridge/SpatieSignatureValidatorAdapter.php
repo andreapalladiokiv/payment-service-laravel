@@ -13,9 +13,10 @@ use Spatie\WebhookClient\WebhookConfig;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 
 /**
- * Drives the single spatie config entry. Hands the PSR-7 request and the
- * parsed payload to {@see WebhookRouter::identifyGateway()}; on match, stashes
- * the resolved tenant on the Laravel request so
+ * Drives the single spatie config entry. Hands the PSR-7 request to
+ * {@see WebhookRouter::identifyGateway()}, which verifies the signature and
+ * parses the body itself; on match, stashes the resolved tenant on the Laravel
+ * request so
  * {@see WebhookCall::storeWebhook()} and {@see IdempotencyProfile} can pick
  * it up without reparsing the body.
  */

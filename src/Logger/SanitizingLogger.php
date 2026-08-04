@@ -17,8 +17,10 @@ use Techork\PaymentService\Gateway\Logger\GatewayLoggerInterface;
  * exact name at any depth, since gateway request/response payloads use the
  * same field name across nesting levels (`card.holder`, `holder`, etc.).
  *
- * `null` values are passed through untouched — sanitizers only see non-null
- * input, matching the convention of `App\Infrastructure\Logger\ObfuscatingLogger`.
+ * `null` values end up untouched only because every sanitizer's `match()` rejects
+ * a non-string value — `match()` is still called with `null`, so a sanitizer has to
+ * reject it itself. That passthrough matches the convention of
+ * `App\Infrastructure\Logger\ObfuscatingLogger`.
  */
 final readonly class SanitizingLogger implements GatewayLoggerInterface
 {

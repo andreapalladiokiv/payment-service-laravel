@@ -15,9 +15,8 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 /**
  * {@see CancelPort} backed by {@see PaymentGatewayInterface}. Voids /
  * cancels a held authorization. Gateway refusal becomes a
- * {@see GatewayDeclinedException}; the aggregate's `cancel()` lets it
- * propagate so the caller can decide whether to retry or accept that the
- * auth will simply expire.
+ * {@see GatewayDeclinedException}; the aggregate's `cancel()` catches that
+ * and records a `PaymentIntentFailed`, so it never reaches the caller.
  */
 final readonly class OmnipayCancelPort implements CancelPort
 {
