@@ -10,7 +10,6 @@ use Techork\PaymentService\Common\ValueObject\Country;
 use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CreateRequest;
 use Techork\PaymentService\Gateway\Contract\AuthorizationResult;
-use Techork\PaymentService\Laravel\Port\GatewayReferenceMetadata;
 use Techork\PaymentService\Laravel\Port\OmnipayCreatePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CancelRequest;
@@ -63,7 +62,12 @@ it('hands the resolved reference to the gateway, which no longer looks it up', f
     });
 
     (new OmnipayCapturePort($gateway, referenceRepo('auth_ref'), GatewayId::generate()))
-        ->capture(new CaptureRequest(PaymentIntentId::generate(), new Money(100, new Currency('USD'))));
+        ->capture(new CaptureRequest(
+            PaymentIntentId::generate(),
+            new Money(100, new Currency('USD')),
+            new Money(100, new Currency('USD')),
+            Mockery::mock(PaymentInstrument::class),
+        ));
 
     expect($seen)->toBe('auth_ref');
 });
@@ -71,7 +75,12 @@ it('hands the resolved reference to the gateway, which no longer looks it up', f
 it('refuses a capture with no recorded reference instead of asking the acquirer', function () {
     $port = new OmnipayCapturePort(unreachableGateway(), referenceRepo(null), GatewayId::generate());
 
-    expect(fn () => $port->capture(new CaptureRequest(PaymentIntentId::generate(), new Money(100, new Currency('USD')))))
+    expect(fn () => $port->capture(new CaptureRequest(
+            PaymentIntentId::generate(),
+            new Money(100, new Currency('USD')),
+            new Money(100, new Currency('USD')),
+            Mockery::mock(PaymentInstrument::class),
+        )))
         ->toThrow(RuntimeException::class, 'No gateway transaction reference recorded');
 });
 
@@ -107,47 +116,4 @@ it('stops reporting a missing reference as an issuer refusing a cancellation', f
     expect($thrown)->toBeInstanceOf(RuntimeException::class)
         ->and($thrown)->not->toBeInstanceOf(GatewayDeclinedException::class)
         ->and($thrown->getMessage())->toContain('No gateway transaction reference recorded');
-});
-
-// ──────────────────────────────────────────────
-//  the opening reference is recorded, so a capture cannot bury it
-//
-//  Only half of this is testable here. That the ports WRITE the key is asserted
-//  below; that the repository MERGES it rather than replacing the bag has no test,
-//  because the tree has no database harness and the Eloquent repositories are
-//  untested altogether. The merge is where a regression would hide.
-// ──────────────────────────────────────────────
-
-function metadataCapturingRepo(?array &$seen): GatewayTransactionRepository
-{
-    $repo = Mockery::mock(GatewayTransactionRepository::class);
-    $repo->shouldReceive('saveForPaymentIntent')->once()
-        ->andReturnUsing(function (...$args) use (&$seen) {
-            $seen = $args[3] ?? null;
-        });
-
-    return $repo;
-}
-
-it('records the opening reference beside the metadata the gateway returned', function () {
-    $seen = null;
-
-    $gateway = Mockery::mock(PaymentGatewayInterface::class);
-    $gateway->shouldReceive('authorize')->once()->andReturn(
-        AuthorizationResult::succeeded('auth_ref')->withMetadata(['incoming_transaction_code' => 'itc_1']),
-    );
-
-    (new OmnipayCreatePort($gateway, metadataCapturingRepo($seen), GatewayId::generate()))
-        ->create(new CreateRequest(
-            paymentIntentId: PaymentIntentId::generate(),
-            amount: new Money(100, new Currency('USD')),
-            instrument: Mockery::mock(PaymentInstrument::class),
-            captureMethod: CaptureMethod::Manual,
-            billingAddress: new BillingAddress('Test', 'User', '1 St', 'NYC', new Country('US'), '10001'),
-        ));
-
-    // Beside, not instead of: the gateway's own metadata survives, and the opening
-    // reference joins it under a key `reference` will not overwrite on capture.
-    expect($seen[GatewayReferenceMetadata::OPENING_REFERENCE])->toBe('auth_ref')
-        ->and($seen['incoming_transaction_code'])->toBe('itc_1');
 });

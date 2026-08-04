@@ -16,7 +16,6 @@ use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
 use Techork\PaymentService\Gateway\Contract\PaymentGatewayInterface;
 use Techork\PaymentService\Gateway\Exception\UnsupportedByGateway;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
-use Techork\PaymentService\Laravel\Port\GatewayReferenceMetadata;
 use Techork\PaymentService\Laravel\Port\OmnipayRebillingCreatePort;
 
 /**
@@ -75,7 +74,7 @@ function seriesPort(?string $storedReference, ?PaymentIntentId $genesis): array
             ->with($genesis->toString())
             ->andReturn($storedReference === null
                 ? []
-                : [GatewayReferenceMetadata::OPENING_REFERENCE => $storedReference]);
+                : ['opening_transaction_reference' => $storedReference]);
     }
 
     return [

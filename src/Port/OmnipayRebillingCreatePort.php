@@ -84,7 +84,7 @@ final readonly class OmnipayRebillingCreatePort implements CreatePort
         // reference — a case already handled — instead of a confidently wrong id.
         $genesisReference = $this->genesisPaymentIntentId === null
             ? null
-            : $this->transactionRepository->findMetadataForPaymentIntent($this->genesisPaymentIntentId->toString())[GatewayReferenceMetadata::OPENING_REFERENCE] ?? null;
+            : $this->transactionRepository->findMetadataForPaymentIntent($this->genesisPaymentIntentId->toString())['opening_transaction_reference'] ?? null;
 
         $result = $this->gateway->authorizeRebilling(
             $this->gatewayId,
@@ -98,15 +98,7 @@ final readonly class OmnipayRebillingCreatePort implements CreatePort
         );
 
         if ($result->reference !== null) {
-        // Recorded for the same reason a one-off records it: this authorization may
-        // itself become the anchor of the renewals that follow, and its reference will
-        // be overwritten by its own capture.
-            $this->transactionRepository->saveForPaymentIntent(
-                $this->gatewayId,
-                $clientUniqueId,
-                $result->reference,
-                [...$result->metadata, GatewayReferenceMetadata::OPENING_REFERENCE => $result->reference],
-            );
+            $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
         }
 
         if ($result->challenge !== null) {
