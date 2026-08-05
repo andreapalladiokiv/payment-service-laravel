@@ -26,14 +26,6 @@ use RuntimeException;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
-use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
-use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
-use Symfony\Component\Serializer\Mapping\Loader\AttributeLoader;
-use Symfony\Component\Serializer\Mapping\Loader\LoaderChain;
-use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
-use Symfony\Component\Serializer\Normalizer\BackedEnumNormalizer;
-use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
-use Symfony\Component\Serializer\Normalizer\PropertyNormalizer;
 use Symfony\Component\Serializer\Serializer;
 use Techork\PaymentService\Common\Contract\DecryptInterface;
 use Techork\PaymentService\Common\Contract\EncryptInterface;
@@ -77,13 +69,7 @@ use Techork\PaymentService\Laravel\Rules\Currency;
 use Techork\PaymentService\Laravel\Rules\Duration;
 use Techork\PaymentService\Laravel\Rules\Phone;
 use Techork\PaymentService\Laravel\Rules\State;
-use Techork\PaymentService\Laravel\Serializer\ChallengeNormalizer;
-use Techork\PaymentService\Laravel\Serializer\ChallengeResultNormalizer;
-use Techork\PaymentService\Laravel\Serializer\PaymentInstrumentNormalizer;
-use Techork\PaymentService\Laravel\Serializer\PhoneNumberNormalizer;
-use Techork\PaymentService\Laravel\Serializer\PiiAttributeLoader;
-use Techork\PaymentService\Laravel\Serializer\PiiAwareObjectNormalizer;
-use Techork\PaymentService\Laravel\Serializer\UuidNormalizer;
+use Techork\PaymentService\Laravel\Serializer\PayloadSerializerFactory;
 use Techork\PaymentService\Laravel\Shredding\EloquentPiiStore;
 use Techork\PaymentService\Laravel\Shredding\PiiStore;
 use Techork\PaymentService\Gateway\Logger\GatewayLoggerInterface;
@@ -174,47 +160,11 @@ class GatewayServiceProvider extends PackageServiceProvider
             return $factory;
         });
 
-        $this->app->singleton(Serializer::class, function (Application $app) {
-            $metadataFactory = new ClassMetadataFactory(
-                new LoaderChain([new AttributeLoader, new PiiAttributeLoader]),
-            );
-
-            // `PropertyNormalizer` (not `ObjectNormalizer`) because our VOs
-            // hold their state in private properties and surface it only via
-            // `jsonSerialize`/`__toString` — `ObjectNormalizer` would read
-            // an empty public API and fail to round-trip them. The reflection
-            // path bypasses constructors on rebuild, which is fine here: the
-            // event stream only round-trips through itself.
-            //
-            // `JsonSerializableNormalizer` is intentionally absent: it would
-            // collapse the same VOs to scalars on the way out, breaking the
-            // symmetry with the property-based denormalize path.
-            $piiAware = new PiiAwareObjectNormalizer(
-                new PropertyNormalizer(
-                    classMetadataFactory: $metadataFactory,
-                    propertyTypeExtractor: new ReflectionExtractor,
-                ),
-                $app->make(PiiStore::class),
-                $metadataFactory,
-            );
-
-            return new Serializer([
-                new UuidNormalizer,
-                new PhoneNumberNormalizer,
-                new BackedEnumNormalizer,
-                new DateTimeNormalizer,
-                new ArrayDenormalizer,
-                // Interface-typed slots in aggregates need a concrete-class
-                // resolver before `PiiAwareObjectNormalizer` can look up per-
-                // class PII metadata. Each visitor-based normalizer dispatches
-                // on the concrete impl and then delegates back to the PII
-                // pipeline on the resolved class.
-                new PaymentInstrumentNormalizer($piiAware),
-                new ChallengeNormalizer($piiAware),
-                new ChallengeResultNormalizer($piiAware),
-                $piiAware,
-            ]);
-        });
+        // Built by a factory the serializer tests use too, so a normalizer added here cannot
+        // be missing from what they exercise.
+        $this->app->singleton(Serializer::class, fn (Application $app) => PayloadSerializerFactory::make(
+            $app->make(PiiStore::class),
+        ));
 
         $this->app->singleton(MessageRepository::class, fn (Application $app) => new IlluminateMessageRepository(
             $app->make(DatabaseManager::class)->connection(),

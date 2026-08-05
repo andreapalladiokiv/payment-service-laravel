@@ -46,6 +46,19 @@ final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepo
     {
         $id = $this->resolveId($instrument);
 
+        // Refused, where find() legitimately answers null. A raw card or cash has no identity
+        // of its own — identity arrives with tokenisation — so a reference stored against one
+        // could never be read back: find() resolves the same instrument to null and would
+        // return nothing. Accepting the write would make it look kept. Without this the null
+        // reached the upsert and surfaced as the driver's NOT NULL violation, which names a
+        // column rather than the caller's mistake.
+        if ($id === null) {
+            throw new RuntimeException(sprintf(
+                'A %s carries no identity to store a gateway reference against; tokenise it first.',
+                $instrument::type(),
+            ));
+        }
+
         GatewayReference::query()->upsert(
             [
                 'gateway_id' => $gatewayId->toString(),
@@ -63,6 +76,19 @@ final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepo
     public function saveFailure(GatewayId $gatewayId, PaymentInstrument $instrument, string $reason): void
     {
         $id = $this->resolveId($instrument);
+
+        // Refused, where find() legitimately answers null. A raw card or cash has no identity
+        // of its own — identity arrives with tokenisation — so a reference stored against one
+        // could never be read back: find() resolves the same instrument to null and would
+        // return nothing. Accepting the write would make it look kept. Without this the null
+        // reached the upsert and surfaced as the driver's NOT NULL violation, which names a
+        // column rather than the caller's mistake.
+        if ($id === null) {
+            throw new RuntimeException(sprintf(
+                'A %s carries no identity to store a gateway reference against; tokenise it first.',
+                $instrument::type(),
+            ));
+        }
 
         GatewayReference::query()->upsert(
             [

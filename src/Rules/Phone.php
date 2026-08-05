@@ -29,7 +29,16 @@ final class Phone implements ValidationRule
         $this->format = match (strtolower($format)) {
             self::E164 => PhoneNumberFormat::E164,
             self::INTERNATIONAL => PhoneNumberFormat::INTERNATIONAL,
-            self::NATIONAL => PhoneNumberFormat::NATIONAL,
+            // Refused rather than accepted-and-never-satisfied. `parse()` below is called with
+            // no default region, so a nationally-rendered value never parses, while anything
+            // that does parse carries a country code and cannot equal the national rendering.
+            // The constant therefore rejected every possible input: a field wired to it was
+            // unfillable, and silently so. Supporting it needs a region threaded through this
+            // rule, which is a deliberate change rather than a default.
+            self::NATIONAL => throw new RuntimeException(
+                'Phone::NATIONAL cannot be validated without a default region, so it matches nothing; '
+                .'use E164, INTERNATIONAL or RFC3966, or add region support to this rule.',
+            ),
             self::RFC3966 => PhoneNumberFormat::RFC3966,
             '' => null,
             default => throw new RuntimeException('Invalid format'),
