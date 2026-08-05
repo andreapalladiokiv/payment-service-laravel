@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Serializer;
 
+use ArrayObject;
 use Override;
 use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactoryInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
@@ -70,6 +71,12 @@ final class PiiAwareObjectNormalizer implements NormalizerInterface, Denormalize
         $this->inner->setSerializer($serializer);
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return array<class-string|'*'|'object', bool|null> the keys Symfony's contract
+     *   permits; `'object'` is one of them and is not a class-string
+     */
     #[Override]
     public function getSupportedTypes(?string $format): array
     {
@@ -89,30 +96,37 @@ final class PiiAwareObjectNormalizer implements NormalizerInterface, Denormalize
     }
 
     #[Override]
-    public function normalize(mixed $object, ?string $format = null, array $context = []): array|string|int|float|bool|\ArrayObject|null
+    public function normalize(mixed $data, ?string $format = null, array $context = []): array|string|int|float|bool|ArrayObject|null
     {
-        $data = $this->inner->normalize($object, $format, $context);
+        // The result gets its own name. `$data` is the parameter name the interface
+        // dictates, and it has to keep holding the subject: the PII attributes are looked
+        // up on the object being normalised, not on the array that comes back. Assigning
+        // the result over it makes `$data::class` ask an array for its class.
+        $normalized = $this->inner->normalize($data, $format, $context);
 
-        if (! is_array($data) && ! $data instanceof \ArrayObject) {
-            return $data;
+        if (! is_array($normalized) && ! $normalized instanceof ArrayObject) {
+            return $normalized;
         }
 
-        foreach ($this->piiAttributes($object::class) as $attribute => [, $raw]) {
-            if (! isset($data[$attribute])) {
+        foreach ($this->piiAttributes($data::class) as $attribute => [, $raw]) {
+            if (! isset($normalized[$attribute])) {
                 continue;
             }
 
-            $stored = $raw ? $data[$attribute] : serialize($data[$attribute]);
-            $data[$attribute] = $this->store->store($stored);
+            $stored = $raw ? $normalized[$attribute] : serialize($normalized[$attribute]);
+            $normalized[$attribute] = $this->store->store($stored);
         }
 
-        return $data;
+        return $normalized;
     }
 
     #[Override]
     public function denormalize(mixed $data, string $type, ?string $format = null, array $context = []): mixed
     {
-        if (is_array($data)) {
+        // Repeats what supportsDenormalization() already answered, because Symfony only
+        // calls this after that returned true. Stated here so the analyser can see that
+        // piiAttributes() reflects on a real class rather than on any string.
+        if (is_array($data) && (class_exists($type) || interface_exists($type, false))) {
             foreach ($this->piiAttributes($type) as $attribute => [$pii, $raw]) {
                 $hash = $data[$attribute] ?? null;
                 if (! is_string($hash)) {

@@ -33,9 +33,20 @@ class ProcessWebhookJob extends SpatieProcessWebhookJob
             return;
         }
 
+        $gatewayId = $this->webhookCall->gateway_id;
+
+        if ($gatewayId === null) {
+            // Terminal, not a Delay: the column is nullable and a call stored without a
+            // gateway can never be routed to one, so retrying would only spin until the
+            // queue gave up and then record the wrong reason.
+            $this->webhookCall->markSkipped('Stored without a gateway id');
+
+            return;
+        }
+
         $stored = new StoredWebhookCall(
             kind: $this->webhookCall->name,
-            gatewayId: $this->webhookCall->gateway_id,
+            gatewayId: $gatewayId,
             payload: $this->webhookCall->payload ?? [],
         );
 

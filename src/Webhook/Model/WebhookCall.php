@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Model;
 
+use Override;
 use Techork\PaymentService\Laravel\Webhook\Enum\WebhookCallStatus;
 use Techork\PaymentService\Laravel\Webhook\Profile\IdempotencyProfile;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -54,14 +55,21 @@ class WebhookCall extends SpatieWebhookCall
         'gateway_id' => UuidValueObjectCast::class.':'.GatewayId::class,
     ];
 
+    /**
+     * Protected on purpose. Laravel routes a scope called statically through
+     * `__callStatic`, which PHP only reaches for an INACCESSIBLE method — a public
+     * `pending()` makes `WebhookCall::pending()` an `Error: Non-static method cannot be
+     * called statically` instead. Nothing called it that way yet, which is why it went
+     * unnoticed.
+     */
     #[Scope]
-    public function pending(Builder $query): Builder
+    protected function pending(Builder $query): Builder
     {
         return $query->where('status', WebhookCallStatus::Pending);
     }
 
     /**
-     * @return BelongsTo<Gateway, $this>
+     * @return BelongsTo<Gateway, self>
      */
     public function gateway(): BelongsTo
     {
@@ -97,6 +105,7 @@ class WebhookCall extends SpatieWebhookCall
         $this->save();
     }
 
+    #[Override]
     public static function storeWebhook(WebhookConfig $config, Request $request): self
     {
         $meta = $request->attributes->get(self::REQUEST_META_ATTRIBUTE, []);
