@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Encryption;
 
-use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Contracts\Encryption\StringEncrypter;
 use Override;
 use Techork\PaymentService\Common\Contract\DecryptInterface;
@@ -13,11 +12,21 @@ use Techork\PaymentService\Common\Contract\EncryptInterface;
 final readonly class LaravelEncrypter implements DecryptInterface, EncryptInterface
 {
     /**
-     * Intersection, not just `Encrypter`: `encryptString()`/`decryptString()` are declared
-     * on `StringEncrypter`, while the container binding is keyed on `Encrypter`. Laravel's
-     * own encrypter implements both, so naming both is what the code actually requires.
+     * `StringEncrypter`, which is where `encryptString()`/`decryptString()` are
+     * declared and therefore the only thing this class needs. `Encrypter` — the
+     * contract the binding used to name — declares neither.
+     *
+     * NOT the intersection of the two, even though Laravel's own encrypter
+     * satisfies both and the intersection reads as the more precise statement. The
+     * container cannot autowire one: it identifies a dependency through
+     * {@see \Illuminate\Support\Reflector::getParameterClassName()}, which answers
+     * only for a `ReflectionNamedType`, so an intersection is taken for a primitive
+     * and every resolution of this class fails with an unresolvable dependency. As
+     * this backs `EncryptInterface` and `DecryptInterface`, that took the gateway
+     * router with it — nothing could open a payment. `encrypter` is aliased to
+     * `StringEncrypter` as well as to `Encrypter`, so naming one resolves.
      */
-    public function __construct(private Encrypter&StringEncrypter $encrypter) {}
+    public function __construct(private StringEncrypter $encrypter) {}
 
     #[Override]
     public function encrypt(string $data): string
