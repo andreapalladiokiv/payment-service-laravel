@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook;
 
+use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\PackageManifest;
 use Illuminate\Support\ServiceProvider;
 use Nyholm\Psr7\Factory\Psr17Factory;
+use Override;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Techork\PaymentService\Laravel\Webhook\Service\EloquentInstrumentReferenceEraser;
 use Techork\PaymentService\Laravel\Webhook\Service\EloquentPaymentIntentRecorder;
@@ -57,6 +59,7 @@ use Techork\PaymentService\Gateway\Webhook\VerifierRegistry;
  */
 final class WebhookServiceProvider extends ServiceProvider
 {
+    #[Override]
     public function register(): void
     {
         $this->app->singleton(PsrHttpFactory::class, function (): PsrHttpFactory {
@@ -106,7 +109,9 @@ final class WebhookServiceProvider extends ServiceProvider
      * Build both registries by asking every discovered
      * {@see WebhookSubscriber} to register itself.
      *
+     * @param Application $app
      * @return array{0: VerifierRegistry, 1: HandlerRegistry}
+     * @throws BindingResolutionException
      */
     private function buildRegistries(Application $app): array
     {
@@ -130,7 +135,9 @@ final class WebhookServiceProvider extends ServiceProvider
      * or don't implement the contract — keeps boot resilient when a
      * package is half-installed during a deploy.
      *
+     * @param PackageManifest $manifest
      * @return list<WebhookSubscriber>
+     * @throws BindingResolutionException
      */
     private function discoverSubscribers(PackageManifest $manifest): array
     {

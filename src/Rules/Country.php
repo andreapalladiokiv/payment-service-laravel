@@ -4,6 +4,7 @@ namespace Techork\PaymentService\Laravel\Rules;
 
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Override;
 use Symfony\Component\Intl\Countries;
 
 class Country implements ValidationRule
@@ -18,6 +19,7 @@ class Country implements ValidationRule
     {
     }
 
+    #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         if ($this->format === null) {

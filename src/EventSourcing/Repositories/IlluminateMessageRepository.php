@@ -14,6 +14,7 @@ use EventSauce\EventSourcing\Serialization\MessageSerializer;
 use EventSauce\EventSourcing\UnableToPersistMessages;
 use EventSauce\EventSourcing\UnableToRetrieveMessages;
 use Generator;
+use RuntimeException;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Collection;
 use Override;
@@ -56,7 +57,8 @@ final readonly class IlluminateMessageRepository implements MessageRepository
                 'version' => $payload['headers'][Header::AGGREGATE_ROOT_VERSION] ?? 0,
                 'event_id' => $payload['headers'][Header::EVENT_ID],
                 'payload' => json_encode($payload, $this->jsonEncodeOptions),
-                'aggregate_root_id' => $message->aggregateRootId()->toString(),
+                'aggregate_root_id' => $message->aggregateRootId()?->toString()
+                    ?? throw new RuntimeException('Cannot persist a message that names no aggregate root.'),
             ];
         }
 
@@ -72,7 +74,7 @@ final readonly class IlluminateMessageRepository implements MessageRepository
     {
         $builder = $this->connection->table($this->tableName)
             ->where('aggregate_root_id', $id->toString())
-            ->orderBy('version', 'ASC');
+            ->orderBy('version');
 
         try {
             return $this->yieldMessagesForResult($builder->get(['payload']));
@@ -81,14 +83,14 @@ final readonly class IlluminateMessageRepository implements MessageRepository
         }
     }
 
-    /** @psalm-return Generator<Message> */
+    /** @return Generator<Message> */
     #[Override]
     public function retrieveAllAfterVersion(AggregateRootId $id, int $aggregateRootVersion): Generator
     {
         $builder = $this->connection->table($this->tableName)
             ->where('aggregate_root_id', $id->toString())
             ->where('version', '>', $aggregateRootVersion)
-            ->orderBy('version', 'ASC');
+            ->orderBy('version');
 
         try {
             return $this->yieldMessagesForResult($builder->get(['payload']));
@@ -98,7 +100,8 @@ final readonly class IlluminateMessageRepository implements MessageRepository
     }
 
     /**
-     * @param Collection<int, mixed> $result
+     * @param Collection<int, \stdClass> $result the query selects a single column, so the
+     *   rows arrive as stdClass and `$row->payload` below is what reads it
      * @psalm-return Generator<int, Message>
      */
     private function yieldMessagesForResult(Collection $result): Generator
@@ -119,7 +122,7 @@ final readonly class IlluminateMessageRepository implements MessageRepository
         $builder = $this->connection->table($this->tableName)
             ->limit($offsetCursor->limit())
             ->where('id', '>', $offset)
-            ->orderBy('id', 'ASC');
+            ->orderBy('id');
 
         try {
             $result = $builder->get(['id', 'payload']);

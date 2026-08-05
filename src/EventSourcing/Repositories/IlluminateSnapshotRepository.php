@@ -10,11 +10,11 @@ use EventSauce\EventSourcing\Snapshotting\SnapshotRepository;
 use Illuminate\Database\ConnectionInterface;
 use Override;
 
-final class IlluminateSnapshotRepository implements SnapshotRepository
+final readonly class IlluminateSnapshotRepository implements SnapshotRepository
 {
     public function __construct(
-        private readonly ConnectionInterface $connection,
-        private readonly string $table = 'aggregate_snapshots',
+        private ConnectionInterface $connection,
+        private string              $table = 'aggregate_snapshots',
     ) {}
 
     #[Override]
@@ -45,7 +45,7 @@ final class IlluminateSnapshotRepository implements SnapshotRepository
 
         return new Snapshot(
             $id,
-            (int) $row->aggregate_root_version,
+            max(0, (int) $row->aggregate_root_version),
             json_decode($row->state, true, 512, JSON_THROW_ON_ERROR),
         );
     }

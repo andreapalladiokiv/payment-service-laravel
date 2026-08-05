@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Repository;
 
+use Override;
 use Techork\PaymentService\Gateway\Contract\VirtualCardReferenceRepository;
 use Techork\PaymentService\Laravel\Models\GatewayReference;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
@@ -12,6 +13,7 @@ final readonly class EloquentVirtualCardReferenceRepository implements VirtualCa
 {
     private const string MORPH_TYPE = 'virtual_card';
 
+    #[Override]
     public function find(GatewayId $gatewayId, string $virtualCardId): ?string
     {
         return GatewayReference::query()
@@ -21,6 +23,7 @@ final readonly class EloquentVirtualCardReferenceRepository implements VirtualCa
             ->value('reference');
     }
 
+    #[Override]
     public function findVirtualCardId(GatewayId $gatewayId, string $reference): ?string
     {
         return GatewayReference::query()
@@ -30,6 +33,7 @@ final readonly class EloquentVirtualCardReferenceRepository implements VirtualCa
             ->value('referenceable_id');
     }
 
+    #[Override]
     public function saveReference(GatewayId $gatewayId, string $virtualCardId, string $reference): void
     {
         GatewayReference::query()

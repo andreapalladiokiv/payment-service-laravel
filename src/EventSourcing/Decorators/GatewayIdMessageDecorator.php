@@ -7,6 +7,7 @@ namespace Techork\PaymentService\Laravel\EventSourcing\Decorators;
 use EventSauce\EventSourcing\Message;
 use EventSauce\EventSourcing\MessageDecorator;
 use Illuminate\Log\Context\Repository as ContextRepository;
+use Override;
 
 final readonly class GatewayIdMessageDecorator implements MessageDecorator
 {
@@ -14,6 +15,7 @@ final readonly class GatewayIdMessageDecorator implements MessageDecorator
 
     public function __construct(private ContextRepository $context) {}
 
+    #[Override]
     public function decorate(Message $message): Message
     {
         return $message->withHeaders([

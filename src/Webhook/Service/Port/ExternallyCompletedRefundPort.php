@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Service\Port;
 
+use Override;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Refund\Port\RefundPort;
 use Techork\PaymentService\Domain\PaymentIntent\Refund\Port\Request\RefundRequest;
@@ -31,6 +32,7 @@ final readonly class ExternallyCompletedRefundPort implements RefundPort
         return new self($reason);
     }
 
+    #[Override]
     public function refund(RefundRequest $request): void
     {
         if ($this->declineReason !== null) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Repository;
 
+use Override;
 use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
 use Techork\PaymentService\Laravel\Models\GatewayReference;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
@@ -21,26 +22,31 @@ final class EloquentGatewayTransactionRepository implements GatewayTransactionRe
 
     public const string TYPE_REFUND = 'refund';
 
+    #[Override]
     public function findForPaymentIntent(string $paymentIntentId): ?string
     {
         return $this->find(self::TYPE_PAYMENT_INTENT, $paymentIntentId);
     }
 
+    #[Override]
     public function saveForPaymentIntent(GatewayId $gatewayId, string $paymentIntentId, string $reference, array $metadata = []): void
     {
         $this->save($gatewayId, self::TYPE_PAYMENT_INTENT, $paymentIntentId, $reference, $metadata);
     }
 
+    #[Override]
     public function findMetadataForPaymentIntent(string $paymentIntentId): array
     {
         return $this->findMetadata(self::TYPE_PAYMENT_INTENT, $paymentIntentId);
     }
 
+    #[Override]
     public function findForRefund(string $refundId): ?string
     {
         return $this->find(self::TYPE_REFUND, $refundId);
     }
 
+    #[Override]
     public function saveForRefund(GatewayId $gatewayId, string $refundId, string $reference): void
     {
         $this->save($gatewayId, self::TYPE_REFUND, $refundId, $reference);

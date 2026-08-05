@@ -8,6 +8,7 @@ use Money\Currencies;
 use Money\Currencies\AggregateCurrencies;
 use Money\Currencies\CryptoCurrencies;
 use Money\Currencies\ISOCurrencies;
+use Override;
 
 readonly class Currency implements ValidationRule
 {
@@ -21,6 +22,7 @@ readonly class Currency implements ValidationRule
         $this->types = $types;
     }
 
+    #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         $this->currencies()->contains(new \Money\Currency($value)) || $fail('validation.currency.invalid', $attribute . ' is not a valid currency.');

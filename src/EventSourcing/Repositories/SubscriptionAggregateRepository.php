@@ -21,6 +21,7 @@ use Techork\PaymentService\Domain\Subscription\ValueObject\SubscriptionId;
 
 /**
  * @extends EventSourcedAggregateRootRepository<SubscriptionAggregate>
+ * @implements AggregateRootRepositoryWithSnapshotting<SubscriptionAggregate>
  */
 final class SubscriptionAggregateRepository extends EventSourcedAggregateRootRepository implements AggregateRootRepositoryWithSnapshotting, SubscriptionAggregateRepositoryInterface
 {
@@ -54,7 +55,13 @@ final class SubscriptionAggregateRepository extends EventSourcedAggregateRootRep
     #[Override]
     public function retrieve(AggregateRootId|SubscriptionId $aggregateRootId): SubscriptionAggregate
     {
-        return $this->snapshottingRepository->retrieveFromSnapshot($aggregateRootId);
+        $aggregate = $this->snapshottingRepository->retrieveFromSnapshot($aggregateRootId);
+
+        // EventSauce's snapshotting repository is typed to the interface, but this one was
+        // constructed for a single aggregate class, so it can only hand that back.
+        assert($aggregate instanceof SubscriptionAggregate);
+
+        return $aggregate;
     }
 
     #[Override]

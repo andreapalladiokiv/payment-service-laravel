@@ -6,12 +6,14 @@ namespace Techork\PaymentService\Laravel\Serializer;
 
 use InvalidArgumentException;
 use Override;
+use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Techork\PaymentService\Common\Contract\Challenge;
 use Techork\PaymentService\Common\Contract\ChallengeVisitor;
 use Techork\PaymentService\Common\ValueObject\Challenge\RedirectChallenge;
 use Techork\PaymentService\Common\ValueObject\Challenge\ThreeDSChallenge;
+use function sprintf;
 
 /**
  * Resolve `Challenge` to a concrete class on both sides of the serializer
@@ -47,12 +49,13 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
     public function __construct(private readonly PiiAwareObjectNormalizer $delegate) {}
 
     #[Override]
-    public function normalize(mixed $object, ?string $format = null, array $context = []): array
+    public function normalize(mixed $data, ?string $format = null, array $context = []): array
     {
+        assert($data instanceof Challenge);
         $this->format = $format;
         $this->context = $context;
 
-        return $object->accept($this);
+        return $data->accept($this);
     }
 
     #[Override]
@@ -67,7 +70,7 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
         $concreteType = match ($data['type'] ?? null) {
             self::TYPE_THREEDS => ThreeDSChallenge::class,
             self::TYPE_REDIRECT => RedirectChallenge::class,
-            default => throw new InvalidArgumentException(\sprintf(
+            default => throw new InvalidArgumentException(sprintf(
                 'Cannot denormalize Challenge: missing or unknown "type" key (%s).',
                 var_export($data['type'] ?? null, true),
             )),
@@ -82,6 +85,11 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
         return is_a($type, Challenge::class, true);
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return array<class-string, bool>
+     */
     #[Override]
     public function getSupportedTypes(?string $format): array
     {
@@ -101,7 +109,10 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
     }
 
     /**
+     * @param Challenge $challenge
+     * @param string $type
      * @return array<string, mixed>
+     * @throws ExceptionInterface
      */
     private function serialize(Challenge $challenge, string $type): array
     {

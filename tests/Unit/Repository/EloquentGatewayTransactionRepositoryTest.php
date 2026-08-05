@@ -93,7 +93,7 @@ it('treats an empty metadata array as no signal rather than as erase', function 
 
     $repo->saveForPaymentIntent($gatewayId, $piId, 'auth_ref', ['opening_transaction_reference' => 'auth_ref']);
     // A gateway whose capture response carries nothing — Nuvei's, for one.
-    $repo->saveForPaymentIntent($gatewayId, $piId, 'settle_ref', []);
+    $repo->saveForPaymentIntent($gatewayId, $piId, 'settle_ref');
 
     expect($repo->findMetadataForPaymentIntent($piId))->toBe(['opening_transaction_reference' => 'auth_ref'])
         ->and($repo->findForPaymentIntent($piId))->toBe('settle_ref');

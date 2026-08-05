@@ -6,12 +6,14 @@ namespace Techork\PaymentService\Laravel\Serializer;
 
 use InvalidArgumentException;
 use Override;
+use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Techork\PaymentService\Common\Contract\ChallengeResult;
 use Techork\PaymentService\Common\Contract\ChallengeResultVisitor;
 use Techork\PaymentService\Common\ValueObject\Challenge\RedirectResult;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
+use function sprintf;
 
 /**
  * `ChallengeResult` interface counterpart to {@see ChallengeNormalizer}.
@@ -32,12 +34,12 @@ final class ChallengeResultNormalizer implements ChallengeResultVisitor, Denorma
     public function __construct(private readonly PiiAwareObjectNormalizer $delegate) {}
 
     #[Override]
-    public function normalize(mixed $object, ?string $format = null, array $context = []): array
+    public function normalize(mixed $data, ?string $format = null, array $context = []): array
     {
         $this->format = $format;
         $this->context = $context;
 
-        return $object->accept($this);
+        return $data->accept($this);
     }
 
     #[Override]
@@ -52,7 +54,7 @@ final class ChallengeResultNormalizer implements ChallengeResultVisitor, Denorma
         $concreteType = match ($data['type'] ?? null) {
             self::TYPE_THREEDS => ThreeDSResult::class,
             self::TYPE_REDIRECT => RedirectResult::class,
-            default => throw new InvalidArgumentException(\sprintf(
+            default => throw new InvalidArgumentException(sprintf(
                 'Cannot denormalize ChallengeResult: missing or unknown "type" key (%s).',
                 var_export($data['type'] ?? null, true),
             )),
@@ -67,6 +69,11 @@ final class ChallengeResultNormalizer implements ChallengeResultVisitor, Denorma
         return is_a($type, ChallengeResult::class, true);
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return array<class-string, bool>
+     */
     #[Override]
     public function getSupportedTypes(?string $format): array
     {
@@ -86,7 +93,10 @@ final class ChallengeResultNormalizer implements ChallengeResultVisitor, Denorma
     }
 
     /**
+     * @param ChallengeResult $result
+     * @param string $type
      * @return array<string, mixed>
+     * @throws ExceptionInterface
      */
     private function serialize(ChallengeResult $result, string $type): array
     {

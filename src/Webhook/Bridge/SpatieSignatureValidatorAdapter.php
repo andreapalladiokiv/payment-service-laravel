@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Bridge;
 
+use Override;
 use Techork\PaymentService\Laravel\Webhook\Model\WebhookCall;
 use Techork\PaymentService\Laravel\Webhook\Profile\IdempotencyProfile;
 use Techork\PaymentService\Gateway\Webhook\WebhookRouter;
@@ -27,6 +28,7 @@ final readonly class SpatieSignatureValidatorAdapter implements SignatureValidat
         private PsrHttpFactory $psrFactory,
     ) {}
 
+    #[Override]
     public function isValid(Request $request, WebhookConfig $config): bool
     {
         $psrRequest = $this->psrFactory->createRequest($request);

@@ -21,6 +21,7 @@ use Techork\PaymentService\Domain\Checkout\ValueObject\CheckoutId;
 
 /**
  * @extends EventSourcedAggregateRootRepository<CheckoutAggregate>
+ * @implements AggregateRootRepositoryWithSnapshotting<CheckoutAggregate>
  */
 final class CheckoutAggregateRepository extends EventSourcedAggregateRootRepository implements AggregateRootRepositoryWithSnapshotting, CheckoutAggregateRepositoryInterface
 {
@@ -54,7 +55,13 @@ final class CheckoutAggregateRepository extends EventSourcedAggregateRootReposit
     #[Override]
     public function retrieve(AggregateRootId|CheckoutId $aggregateRootId): CheckoutAggregate
     {
-        return $this->snapshottingRepository->retrieveFromSnapshot($aggregateRootId);
+        $aggregate = $this->snapshottingRepository->retrieveFromSnapshot($aggregateRootId);
+
+        // EventSauce's snapshotting repository is typed to the interface, but this one was
+        // constructed for a single aggregate class, so it can only hand that back.
+        assert($aggregate instanceof CheckoutAggregate);
+
+        return $aggregate;
     }
 
     #[Override]

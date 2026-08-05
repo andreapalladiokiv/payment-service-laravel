@@ -6,6 +6,7 @@ namespace Techork\PaymentService\Laravel\Webhook\Service;
 
 use DomainException;
 use Money\Money;
+use Override;
 use Techork\PaymentService\Common\ValueObject\Challenge\RedirectResult;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSStatus;
@@ -44,6 +45,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
         private GatewayTransactionRepository $transactionRepository,
     ) {}
 
+    #[Override]
     public function onGatewaySuccess(
         GatewayId $gatewayId,
         string $paymentIntentId,
@@ -95,6 +97,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
         return RecorderOutcome::Applied;
     }
 
+    #[Override]
     public function onGatewayAuthorization(
         GatewayId $gatewayId,
         string $paymentIntentId,
@@ -122,6 +125,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
         return RecorderOutcome::Applied;
     }
 
+    #[Override]
     public function onGatewayFailure(string $paymentIntentId, string $reason): RecorderOutcome
     {
         $id = PaymentIntentId::fromString($paymentIntentId);
@@ -144,6 +148,7 @@ final readonly class EloquentPaymentIntentRecorder implements GatewayAuthorizati
         return RecorderOutcome::Applied;
     }
 
+    #[Override]
     public function onGatewayCancellation(string $paymentIntentId): RecorderOutcome
     {
         $id = PaymentIntentId::fromString($paymentIntentId);

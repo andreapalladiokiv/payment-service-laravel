@@ -21,6 +21,7 @@ use Techork\PaymentService\Domain\PaymentIntent\ValueObject\PaymentIntentId;
 
 /**
  * @extends EventSourcedAggregateRootRepository<PaymentIntentAggregate>
+ * @implements AggregateRootRepositoryWithSnapshotting<PaymentIntentAggregate>
  */
 final class PaymentIntentAggregateRepository extends EventSourcedAggregateRootRepository implements AggregateRootRepositoryWithSnapshotting, PaymentIntentAggregateRepositoryInterface
 {
@@ -54,7 +55,13 @@ final class PaymentIntentAggregateRepository extends EventSourcedAggregateRootRe
     #[Override]
     public function retrieve(AggregateRootId|PaymentIntentId $aggregateRootId): PaymentIntentAggregate
     {
-        return $this->snapshottingRepository->retrieveFromSnapshot($aggregateRootId);
+        $aggregate = $this->snapshottingRepository->retrieveFromSnapshot($aggregateRootId);
+
+        // EventSauce's snapshotting repository is typed to the interface, but this one was
+        // constructed for a single aggregate class, so it can only hand that back.
+        assert($aggregate instanceof PaymentIntentAggregate);
+
+        return $aggregate;
     }
 
     #[Override]

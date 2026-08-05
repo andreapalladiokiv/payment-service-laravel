@@ -6,6 +6,7 @@ namespace Techork\PaymentService\Laravel\Serializer;
 
 use InvalidArgumentException;
 use Override;
+use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Techork\PaymentService\Common\Contract\PaymentInstrument;
@@ -15,6 +16,7 @@ use Techork\PaymentService\Common\ValueObject\CreditCard;
 use Techork\PaymentService\Common\ValueObject\HostedPayment;
 use Techork\PaymentService\Common\ValueObject\PaymentMethod;
 use Techork\PaymentService\Common\ValueObject\Token;
+use function sprintf;
 
 /**
  * Resolve `PaymentInstrument` to a concrete class on both sides of the
@@ -46,12 +48,12 @@ final class PaymentInstrumentNormalizer implements DenormalizerInterface, Normal
     public function __construct(private readonly PiiAwareObjectNormalizer $delegate) {}
 
     #[Override]
-    public function normalize(mixed $object, ?string $format = null, array $context = []): array
+    public function normalize(mixed $data, ?string $format = null, array $context = []): array
     {
         $this->format = $format;
         $this->context = $context;
 
-        return $object->accept($this);
+        return $data->accept($this);
     }
 
     #[Override]
@@ -69,7 +71,7 @@ final class PaymentInstrumentNormalizer implements DenormalizerInterface, Normal
             Token::type() => Token::class,
             PaymentMethod::type() => PaymentMethod::class,
             HostedPayment::type() => HostedPayment::class,
-            default => throw new InvalidArgumentException(\sprintf(
+            default => throw new InvalidArgumentException(sprintf(
                 'Cannot denormalize PaymentInstrument: missing or unknown "type" key (%s).',
                 var_export($data['type'] ?? null, true),
             )),
@@ -84,6 +86,11 @@ final class PaymentInstrumentNormalizer implements DenormalizerInterface, Normal
         return is_a($type, PaymentInstrument::class, true);
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return array<class-string, bool>
+     */
     #[Override]
     public function getSupportedTypes(?string $format): array
     {
@@ -121,7 +128,9 @@ final class PaymentInstrumentNormalizer implements DenormalizerInterface, Normal
     }
 
     /**
+     * @param PaymentInstrument $instrument
      * @return array<string, mixed>
+     * @throws ExceptionInterface
      */
     private function serialize(PaymentInstrument $instrument): array
     {

@@ -5,16 +5,19 @@ declare(strict_types=1);
 namespace Techork\PaymentService\Laravel\Logger\Sanitizer;
 
 use Illuminate\Support\Str;
+use Override;
 use Techork\PaymentService\Laravel\Logger\SanitizerInterface;
 
 final readonly class EmailSanitizer implements SanitizerInterface
 {
+    #[Override]
     public function match(string $name, mixed $value): bool
     {
         return filter_var($value, FILTER_VALIDATE_EMAIL) !== false;
     }
 
-    public function mask(string $name, mixed $value): mixed
+    #[Override]
+    public function mask(string $name, mixed $value): string
     {
         $email = (string) $value;
         $atPos = Str::position($email, '@');

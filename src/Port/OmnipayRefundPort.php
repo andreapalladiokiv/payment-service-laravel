@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
+use Override;
 use RuntimeException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Refund\Port\RefundPort;
@@ -26,6 +27,7 @@ final readonly class OmnipayRefundPort implements RefundPort
         private GatewayId $gatewayId,
     ) {}
 
+    #[Override]
     public function refund(RefundRequest $request): void
     {
         $paymentIntentId = $request->paymentIntentId->toString();

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Repository;
 
+use Override;
+use RuntimeException;
 use Techork\PaymentService\Common\Contract\PaymentInstrument;
 use Techork\PaymentService\Common\Contract\PaymentInstrumentVisitor;
 use Techork\PaymentService\Common\ValueObject\Cash;
@@ -18,8 +20,12 @@ use Techork\PaymentService\Gateway\Contract\GatewayInstrumentRepository;
 use Techork\PaymentService\Laravel\Models\GatewayReference;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 
+/**
+ * @implements PaymentInstrumentVisitor<UuidValueObject|null>
+ */
 final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepository, PaymentInstrumentVisitor
 {
+    #[Override]
     public function find(GatewayId $gatewayId, PaymentInstrument $instrument): ?string
     {
         $id = $this->resolveId($instrument);
@@ -35,6 +41,7 @@ final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepo
             ->value('reference');
     }
 
+    #[Override]
     public function saveReference(GatewayId $gatewayId, PaymentInstrument $instrument, string $reference): void
     {
         $id = $this->resolveId($instrument);
@@ -52,6 +59,7 @@ final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepo
         );
     }
 
+    #[Override]
     public function saveFailure(GatewayId $gatewayId, PaymentInstrument $instrument, string $reason): void
     {
         $id = $this->resolveId($instrument);
@@ -73,28 +81,33 @@ final class EloquentGatewayInstrumentRepository implements GatewayInstrumentRepo
         return $instrument->accept($this);
     }
 
+    #[Override]
     public function visitCreditCard(CreditCard $card): null
     {
         return null;
     }
 
+    #[Override]
     public function visitCash(Cash $cash): null
     {
         return null;
     }
 
+    #[Override]
     public function visitToken(Token $token): TokenId
     {
         return $token->id;
     }
 
+    #[Override]
     public function visitPaymentMethod(PaymentMethod $paymentMethod): PaymentMethodId
     {
         return $paymentMethod->id;
     }
 
+    #[Override]
     public function visitHostedPayment(HostedPayment $hosted): never
     {
-        throw new \RuntimeException('Hosted-payment instruments are not supported in this context.');
+        throw new RuntimeException('Hosted-payment instruments are not supported in this context.');
     }
 }

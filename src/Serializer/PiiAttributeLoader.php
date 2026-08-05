@@ -13,6 +13,7 @@ use Symfony\Component\Serializer\Mapping\AttributeMetadata;
 use Symfony\Component\Serializer\Mapping\ClassMetadataInterface;
 use Symfony\Component\Serializer\Mapping\Loader\LoaderInterface;
 use Techork\PaymentService\Common\Pii;
+use function sprintf;
 
 /**
  * Loader that records #[Pii] attribute info into symfony's standard
@@ -91,7 +92,7 @@ final class PiiAttributeLoader implements LoaderInterface
 
         if ($stub === null) {
             if (! $type->allowsNull()) {
-                throw new LogicException(\sprintf(
+                throw new LogicException(sprintf(
                     'Pii stub for %s::$%s is null but the property type "%s" is not nullable.',
                     $class,
                     $property->getName(),
@@ -106,7 +107,7 @@ final class PiiAttributeLoader implements LoaderInterface
         $matches = $type->isBuiltin() ? $this->matchesBuiltinType($stub, $typeName) : $stub instanceof $typeName;
 
         if (! $matches) {
-            throw new LogicException(\sprintf(
+            throw new LogicException(sprintf(
                 'Pii stub for %s::$%s is of type "%s" but the property declares "%s".',
                 $class,
                 $property->getName(),

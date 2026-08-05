@@ -29,9 +29,9 @@ use Techork\PaymentService\Common\ValueObject\PhoneNumber;
 final class PhoneNumberNormalizer implements DenormalizerInterface, NormalizerInterface
 {
     #[Override]
-    public function normalize(mixed $object, ?string $format = null, array $context = []): string
+    public function normalize(mixed $data, ?string $format = null, array $context = []): string
     {
-        return (string) $object;
+        return (string) $data;
     }
 
     #[Override]
@@ -52,6 +52,11 @@ final class PhoneNumberNormalizer implements DenormalizerInterface, NormalizerIn
         return is_a($type, PhoneNumber::class, true);
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return array<class-string, bool>
+     */
     #[Override]
     public function getSupportedTypes(?string $format): array
     {

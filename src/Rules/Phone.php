@@ -8,18 +8,19 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use libphonenumber\PhoneNumberFormat;
 use libphonenumber\PhoneNumberUtil;
+use Override;
 use RuntimeException;
 use Throwable;
 
 final class Phone implements ValidationRule
 {
-    public const E164 = 'e164';
+    public const string E164 = 'e164';
 
-    public const INTERNATIONAL = 'international';
+    public const string INTERNATIONAL = 'international';
 
-    public const NATIONAL = 'national';
+    public const string NATIONAL = 'national';
 
-    public const RFC3966 = 'rfc3966';
+    public const string RFC3966 = 'rfc3966';
 
     private ?PhoneNumberFormat $format;
 
@@ -35,6 +36,7 @@ final class Phone implements ValidationRule
         };
     }
 
+    #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         try {

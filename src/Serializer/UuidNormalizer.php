@@ -24,9 +24,9 @@ use Symfony\Component\Serializer\Normalizer\PropertyNormalizer;
 final readonly class UuidNormalizer implements DenormalizerInterface, NormalizerInterface
 {
     #[Override]
-    public function normalize(mixed $object, ?string $format = null, array $context = []): string
+    public function normalize(mixed $data, ?string $format = null, array $context = []): string
     {
-        return $object->toString();
+        return $data->toString();
     }
 
     #[Override]
@@ -47,6 +47,11 @@ final readonly class UuidNormalizer implements DenormalizerInterface, Normalizer
         return is_a($type, UuidInterface::class, true);
     }
 
+    /**
+     * @inheritDoc
+     *
+     * @return array<class-string, bool>
+     */
     #[Override]
     public function getSupportedTypes(?string $format): array
     {

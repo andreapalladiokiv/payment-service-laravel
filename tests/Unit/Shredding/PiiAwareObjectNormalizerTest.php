@@ -2,13 +2,18 @@
 
 declare(strict_types=1);
 
+use Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory;
+use Symfony\Component\Serializer\Mapping\Loader\AttributeLoader;
+use Symfony\Component\Serializer\Mapping\Loader\LoaderChain;
 use Symfony\Component\Serializer\Normalizer\ArrayDenormalizer;
 use Symfony\Component\Serializer\Normalizer\BackedEnumNormalizer;
 use Symfony\Component\Serializer\Normalizer\DateTimeNormalizer;
 use Symfony\Component\Serializer\Normalizer\JsonSerializableNormalizer;
+use Symfony\Component\Serializer\Normalizer\ObjectNormalizer;
 use Symfony\Component\Serializer\Serializer;
 use Techork\PaymentService\Common\Pii;
 use Techork\PaymentService\Common\ShreddingStubs;
+use Techork\PaymentService\Laravel\Serializer\PiiAttributeLoader;
 use Techork\PaymentService\Laravel\Serializer\PiiAwareObjectNormalizer;
 use Techork\PaymentService\Laravel\Shredding\PiiStore;
 
@@ -50,7 +55,7 @@ final readonly class TestEventNullablePii
     ) {}
 }
 
-final readonly class TestEventStringableVo implements \JsonSerializable, \Stringable
+final readonly class TestEventStringableVo implements JsonSerializable, Stringable
 {
     public function __construct(public string $value) {}
     public function __toString(): string { return $this->value; }
@@ -141,15 +146,15 @@ final readonly class TestEventObjectPropertyStringStub
 
 function makeSerializer(PiiStore $store, bool $piiFirst = false): Serializer
 {
-    $cmf = new \Symfony\Component\Serializer\Mapping\Factory\ClassMetadataFactory(
-        new \Symfony\Component\Serializer\Mapping\Loader\LoaderChain([
-            new \Symfony\Component\Serializer\Mapping\Loader\AttributeLoader,
-            new \Techork\PaymentService\Laravel\Serializer\PiiAttributeLoader,
+    $cmf = new ClassMetadataFactory(
+        new LoaderChain([
+            new AttributeLoader,
+            new PiiAttributeLoader,
         ]),
     );
 
     $piiNormalizer = new PiiAwareObjectNormalizer(
-        new \Symfony\Component\Serializer\Normalizer\ObjectNormalizer(classMetadataFactory: $cmf),
+        new ObjectNormalizer(classMetadataFactory: $cmf),
         $store,
         $cmf,
     );
@@ -252,7 +257,7 @@ it('reuses same hash for identical plaintext (deterministic)', function () {
 it('JsonSerializable VO is normalized via JsonSerializableNormalizer when PiiAware is last in chain', function () {
     // PiiAware последний → JsonSerializableNormalizer перехватывает Stringable VO первым → string в payload.
     $store = new TestStubInMemoryStore;
-    $payload = makeSerializer($store, piiFirst: false)->normalize(
+    $payload = makeSerializer($store)->normalize(
         new TestEventWithStringableVo(new TestEventStringableVo('foo'), 'NYC'),
     );
 

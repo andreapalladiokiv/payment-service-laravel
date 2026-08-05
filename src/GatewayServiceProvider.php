@@ -19,6 +19,7 @@ use Illuminate\Foundation\PackageManifest;
 use Illuminate\Validation\Factory;
 use Illuminate\Validation\InvokableValidationRule;
 use Omnipay\Omnipay;
+use Override;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use RuntimeException;
@@ -61,6 +62,7 @@ use Techork\PaymentService\Laravel\EventSourcing\Repositories\PaymentIntentAggre
 use Techork\PaymentService\Laravel\EventSourcing\Repositories\SubscriptionAggregateRepository;
 use Techork\PaymentService\Laravel\EventSourcing\Serialization\SymfonyPayloadSerializer;
 use Techork\PaymentService\Laravel\Logger\Sanitizer\ByPropertyNameSanitizer;
+use Techork\PaymentService\Laravel\Logger\SanitizerInterface;
 use Techork\PaymentService\Laravel\Logger\Sanitizer\CardNumberSanitizer;
 use Techork\PaymentService\Laravel\Logger\Sanitizer\EmailSanitizer;
 use Techork\PaymentService\Laravel\Logger\Sanitizer\PhoneNumberSanitizer;
@@ -100,6 +102,7 @@ class GatewayServiceProvider extends PackageServiceProvider
         PiiStore::class => EloquentPiiStore::class,
     ];
 
+    #[Override]
     public function configurePackage(Package $package): void
     {
         $package
@@ -115,45 +118,56 @@ class GatewayServiceProvider extends PackageServiceProvider
             ]);
     }
 
+    #[Override]
     public function bootingPackage(): void
     {
-        $this->app[Factory::class]->extend('country', function ($attribute, $value, $parameters, $validator) {
+        $this->app->make(Factory::class)->extend('country', function ($attribute, $value, $parameters, $validator) {
             return InvokableValidationRule::make(new Country(...$parameters))
                 ->setValidator($validator)
                 ->passes($attribute, $value);
         });
-        $this->app[Factory::class]->extend('phone', function ($attribute, $value, $parameters, $validator) {
+        $this->app->make(Factory::class)->extend('phone', function ($attribute, $value, $parameters, $validator) {
             return InvokableValidationRule::make(new Phone(...$parameters))
                 ->setValidator($validator)
                 ->passes($attribute, $value);
         });
-        $this->app[Factory::class]->extend('state', function ($attribute, $value, $parameters, $validator) {
+        $this->app->make(Factory::class)->extend('state', function ($attribute, $value, $parameters, $validator) {
             return InvokableValidationRule::make(new State(...$parameters))
                 ->setValidator($validator)
                 ->passes($attribute, $value);
         });
-        $this->app[Factory::class]->extend('currency', function ($attribute, $value, $parameters, $validator) {
+        $this->app->make(Factory::class)->extend('currency', function ($attribute, $value, $parameters, $validator) {
             return InvokableValidationRule::make(new Currency)
                 ->setValidator($validator)
                 ->passes($attribute, $value);
         });
-        $this->app[Factory::class]->extend('duration', function ($attribute, $value, $parameters, $validator) {
+        $this->app->make(Factory::class)->extend('duration', function ($attribute, $value, $parameters, $validator) {
             return InvokableValidationRule::make(new Duration)
                 ->setValidator($validator)
                 ->passes($attribute, $value);
         });
     }
 
+    #[Override]
     public function packageRegistered(): void
     {
         $this->app->singleton(PaymentGatewayInterface::class, PaymentGatewayRouter::class);
 
-        $this->app->singleton(GatewayLoggerInterface::class, fn (Application $app) =>
-            new SanitizingLogger($app[LoggerInterface::class], LogLevel::INFO, ...$app->tagged('sanitizer')));
+        $this->app->singleton(GatewayLoggerInterface::class, function (Application $app) {
+            // `tagged()` is annotated as a bare `iterable`, so neither its keys nor its
+            // values carry a type. Unpacking it directly is unverifiable twice over: the
+            // spread needs int|string keys, and nothing would notice a tag pointing at a
+            // class that is not a sanitiser. Materialising it as a list supplies the keys
+            // and states what the tag is expected to hold.
+            /** @var list<SanitizerInterface> $sanitizers */
+            $sanitizers = iterator_to_array($app->tagged('sanitizer'), false);
+
+            return new SanitizingLogger($app->make(LoggerInterface::class), LogLevel::INFO, ...$sanitizers);
+        });
 
         $this->app->singleton(GatewayFactory::class, function (Application $app) {
             $manifest = $app->make(PackageManifest::class);
-            $factory = new LaravelGatewayFactory($app[CustomerRepository::class], $app['config']);
+            $factory = new LaravelGatewayFactory($app->make(CustomerRepository::class), $app->make('config'));
             $factory->replace($this->discoverGateways($manifest));
             Omnipay::setFactory($factory);
 
@@ -180,7 +194,7 @@ class GatewayServiceProvider extends PackageServiceProvider
                     classMetadataFactory: $metadataFactory,
                     propertyTypeExtractor: new ReflectionExtractor,
                 ),
-                $app[PiiStore::class],
+                $app->make(PiiStore::class),
                 $metadataFactory,
             );
 
@@ -203,16 +217,16 @@ class GatewayServiceProvider extends PackageServiceProvider
         });
 
         $this->app->singleton(MessageRepository::class, fn (Application $app) => new IlluminateMessageRepository(
-            $app[DatabaseManager::class]->connection(),
+            $app->make(DatabaseManager::class)->connection(),
             'stored_events',
             new ConstructingMessageSerializer(
-                payloadSerializer: new SymfonyPayloadSerializer($app[Serializer::class]),
+                payloadSerializer: new SymfonyPayloadSerializer($app->make(Serializer::class)),
             ),
         ));
 
-        $this->app->singleton(SnapshotRepository::class, fn (Application $app) => new IlluminateSnapshotRepository($app[DatabaseManager::class]->connection()));
+        $this->app->singleton(SnapshotRepository::class, fn (Application $app) => new IlluminateSnapshotRepository($app->make(DatabaseManager::class)->connection()));
 
-        $this->app->singleton(SynchronousMessageDispatcher::class, fn (Application $app) => new SynchronousMessageDispatcher($app[LaravelMessageConsumer::class]));
+        $this->app->singleton(SynchronousMessageDispatcher::class, fn (Application $app) => new SynchronousMessageDispatcher($app->make(LaravelMessageConsumer::class)));
 
         $this->app->singleton(DefaultHeadersDecorator::class, fn () => new DefaultHeadersDecorator);
 
@@ -225,9 +239,19 @@ class GatewayServiceProvider extends PackageServiceProvider
 
         $this->app->tag([CardNumberSanitizer::class, EmailSanitizer::class, PhoneNumberSanitizer::class, ByPropertyNameSanitizer::class], 'sanitizer');
 
-        $this->app->singleton(MessageDispatcher::class, fn (Application $app) => new MessageDispatcherChain(...$app->tagged('es.message_dispatcher')));
+        $this->app->singleton(MessageDispatcher::class, function (Application $app) {
+            /** @var list<MessageDispatcher> $dispatchers */
+            $dispatchers = iterator_to_array($app->tagged('es.message_dispatcher'), false);
 
-        $this->app->singleton(MessageDecorator::class, fn (Application $app) => new MessageDecoratorChain(...$app->tagged('es.message_decorator')));
+            return new MessageDispatcherChain(...$dispatchers);
+        });
+
+        $this->app->singleton(MessageDecorator::class, function (Application $app) {
+            /** @var list<MessageDecorator> $decorators */
+            $decorators = iterator_to_array($app->tagged('es.message_decorator'), false);
+
+            return new MessageDecoratorChain(...$decorators);
+        });
 
         $this->registerAggregateRepositories();
 
@@ -235,7 +259,7 @@ class GatewayServiceProvider extends PackageServiceProvider
 
         $this->app->resolving(
             EncrypterAwareInterface::class,
-            fn (EncrypterAwareInterface $instance, Application $app) => $instance->setEncrypter($app[EncryptInterface::class]),
+            fn (EncrypterAwareInterface $instance, Application $app) => $instance->setEncrypter($app->make(EncryptInterface::class)),
         );
     }
 
@@ -267,10 +291,16 @@ class GatewayServiceProvider extends PackageServiceProvider
      * and has no multi-get, so N rules is N round trips; against the Redis store a
      * typical app configures, that costs more per payment than the parsing it was
      * meant to save. Override `firewall.parse_cache` only with another local pool.
+     *
+     * @psalm-suppress TypeDoesNotContainType the Laravel plugin resolves `config()->get()`
+     *   as non-null, so it reads both `??` fallbacks below as dead. This package ships no
+     *   config file at all: in a consuming app those keys are normally absent, and the
+     *   fallbacks — schema discovery and the default cache directory — are the mechanism,
+     *   not a defensive afterthought.
      */
     private function registerFirewall(PackageManifest $manifest): void
     {
-        $schema = $this->app['config']->get('gateway.firewall.schema')
+        $schema = $this->app->make('config')->get('gateway.firewall.schema')
             ?? self::discoverFactSchema($manifest);
 
         if ($schema === null) {
@@ -280,16 +310,16 @@ class GatewayServiceProvider extends PackageServiceProvider
         $this->app->singleton('firewall.parse_cache', fn (Application $app) => new FilesystemAdapter(
             namespace: 'firewall-rules',
             defaultLifetime: 0,
-            directory: $app['config']->get('gateway.firewall.cache_path')
+            directory: $app->make('config')->get('gateway.firewall.cache_path')
                 ?? $app->storagePath('framework/cache/firewall'),
         ));
 
         $this->app->singleton(FactSchema::class, $schema);
 
         $this->app->singleton(RuleEvaluator::class, function (Application $app) {
-            $schema = $app[FactSchema::class];
+            $schema = $app->make(FactSchema::class);
 
-            return new RuleEvaluator(new RuleCompiler($schema), $schema, $app['firewall.parse_cache']);
+            return new RuleEvaluator(new RuleCompiler($schema), $schema, $app->make('firewall.parse_cache'));
         });
     }
 
@@ -338,10 +368,10 @@ class GatewayServiceProvider extends PackageServiceProvider
 
         foreach ($repositories as $interface => $implementation) {
             $this->app->singleton($interface, fn (Application $app) => new $implementation(
-                $app[MessageRepository::class],
-                $app[SnapshotRepository::class],
-                $app[MessageDispatcher::class],
-                $app[MessageDecorator::class],
+                $app->make(MessageRepository::class),
+                $app->make(SnapshotRepository::class),
+                $app->make(MessageDispatcher::class),
+                $app->make(MessageDecorator::class),
             ));
         }
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Profile;
 
+use Override;
 use Techork\PaymentService\Laravel\Webhook\Bridge\SpatieSignatureValidatorAdapter;
 use Techork\PaymentService\Laravel\Webhook\Model\WebhookCall;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ use Spatie\WebhookClient\WebhookProfile\WebhookProfile;
  */
 final readonly class IdempotencyProfile implements WebhookProfile
 {
+    #[Override]
     public function shouldProcess(Request $request): bool
     {
         $meta = $request->attributes->get(WebhookCall::REQUEST_META_ATTRIBUTE, []);

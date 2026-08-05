@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Logger;
 
+use Override;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Stringable;
@@ -34,6 +35,7 @@ final readonly class SanitizingLogger implements GatewayLoggerInterface
         $this->sanitizers = $sanitizers;
     }
 
+    #[Override]
     public function log(Stringable|string $message, array $context = []): void
     {
         $this->logger->log($this->level, $message, $this->walk($context));

@@ -44,7 +44,7 @@ function recordingPsrLogger(): AbstractLogger
         /** @var array<int, array{level: mixed, message: string|Stringable, context: array}> */
         public array $records = [];
 
-        public function log($level, string|\Stringable $message, array $context = []): void
+        public function log($level, string|Stringable $message, array $context = []): void
         {
             $this->records[] = compact('level', 'message', 'context');
         }
@@ -65,7 +65,7 @@ function gatewaySanitizingLogger(AbstractLogger $inner): SanitizingLogger
 
 it('forwards the message at the configured level', function () {
     $inner = recordingPsrLogger();
-    gatewaySanitizingLogger($inner)->log('gateway.request', []);
+    gatewaySanitizingLogger($inner)->log('gateway.request');
 
     expect($inner->records)->toHaveCount(1)
         ->and($inner->records[0]['level'])->toBe(LogLevel::INFO)

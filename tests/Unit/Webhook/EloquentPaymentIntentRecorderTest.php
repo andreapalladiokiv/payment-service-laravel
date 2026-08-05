@@ -130,7 +130,7 @@ function recorderPaymentIntentRepository(array $events): PaymentIntentAggregateR
         public array $recorded = [];
 
         /** @param list<object> $events */
-        public function __construct(private array $events) {}
+        public function __construct(private readonly array $events) {}
 
         public function retrieve(PaymentIntentId $aggregateRootId): PaymentIntentAggregate
         {

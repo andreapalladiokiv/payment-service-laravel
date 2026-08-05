@@ -6,6 +6,7 @@ namespace Techork\PaymentService\Laravel\Logger\Sanitizer;
 
 use Omnipay\Common\CreditCard;
 use Omnipay\Common\Helper;
+use Override;
 use Techork\PaymentService\Laravel\Logger\SanitizerInterface;
 
 /**
@@ -20,6 +21,7 @@ use Techork\PaymentService\Laravel\Logger\SanitizerInterface;
  */
 final readonly class CardNumberSanitizer implements SanitizerInterface
 {
+    #[Override]
     public function match(string $name, mixed $value): bool
     {
         if (! is_string($value) && ! is_int($value)) {
@@ -35,6 +37,7 @@ final readonly class CardNumberSanitizer implements SanitizerInterface
             && Helper::validateLuhn($value);
     }
 
+    #[Override]
     public function mask(string $name, mixed $value): string
     {
         return new CreditCard(['number' => (string) $value])->getNumberMasked('*');

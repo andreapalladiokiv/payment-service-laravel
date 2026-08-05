@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Service\Port;
 
+use Override;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CaptureOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CapturePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CaptureRequest;
@@ -16,6 +17,7 @@ use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CaptureRequest;
  */
 final class ExternallyCompletedCapturePort implements CapturePort
 {
+    #[Override]
     public function capture(CaptureRequest $request): CaptureOutcome
     {
         // gateway already captured — nothing to do here

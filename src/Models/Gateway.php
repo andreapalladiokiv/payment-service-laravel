@@ -7,6 +7,7 @@ namespace Techork\PaymentService\Laravel\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Override;
 use Techork\PaymentService\Gateway\Contract\GatewayCredential;
 use Techork\PaymentService\Laravel\Casts\UuidValueObjectCast;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
@@ -28,21 +29,25 @@ class Gateway extends Model implements GatewayCredential
         'credentials' => 'encrypted:json',
     ];
 
+    #[Override]
     public function getKey(): string
     {
         return (string) $this->id;
     }
 
+    #[Override]
     public function getId(): GatewayId
     {
         return $this->id;
     }
 
+    #[Override]
     public function getGatewayName(): string
     {
         return $this->gateway_name;
     }
 
+    #[Override]
     public function getCredentials(): array
     {
         return $this->credentials;

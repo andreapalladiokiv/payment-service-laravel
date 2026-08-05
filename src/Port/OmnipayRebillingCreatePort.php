@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
+use Override;
 use Techork\PaymentService\Common\ValueObject\ThreeDS\ThreeDSResult;
 use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CreateOutcome;
@@ -60,6 +61,7 @@ final readonly class OmnipayRebillingCreatePort implements CreatePort
         private ?PaymentIntentId $genesisPaymentIntentId,
     ) {}
 
+    #[Override]
     public function create(CreateRequest $request): CreateOutcome
     {
         if ($request->captureMethod === CaptureMethod::Immediate) {

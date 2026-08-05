@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
+use Override;
 use RuntimeException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CancelPort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
@@ -26,6 +27,7 @@ final readonly class OmnipayCancelPort implements CancelPort
         private GatewayId $gatewayId,
     ) {}
 
+    #[Override]
     public function cancel(CancelRequest $request): void
     {
         $paymentIntentId = $request->paymentIntentId->toString();

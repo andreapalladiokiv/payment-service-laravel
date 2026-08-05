@@ -5,12 +5,6 @@ declare(strict_types=1);
 use Money\Currency;
 use Money\Money;
 use Techork\PaymentService\Common\Contract\PaymentInstrument;
-use Techork\PaymentService\Common\ValueObject\BillingAddress;
-use Techork\PaymentService\Common\ValueObject\Country;
-use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
-use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CreateRequest;
-use Techork\PaymentService\Gateway\Contract\AuthorizationResult;
-use Techork\PaymentService\Laravel\Port\OmnipayCreatePort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\GatewayDeclinedException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CancelRequest;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CaptureRequest;
@@ -61,7 +55,7 @@ it('hands the resolved reference to the gateway, which no longer looks it up', f
         return GatewayResult::succeeded('cap_1');
     });
 
-    (new OmnipayCapturePort($gateway, referenceRepo('auth_ref'), GatewayId::generate()))
+    new OmnipayCapturePort($gateway, referenceRepo('auth_ref'), GatewayId::generate())
         ->capture(new CaptureRequest(
             PaymentIntentId::generate(),
             new Money(100, new Currency('USD')),
@@ -137,7 +131,7 @@ it('forwards the hold and the instrument, without which ConnexPay takes the full
     $partial = new Money(300, new Currency('USD'));
     $instrument = Mockery::mock(PaymentInstrument::class);
 
-    (new OmnipayCapturePort($gateway, referenceRepo('auth_ref'), GatewayId::generate()))
+    new OmnipayCapturePort($gateway, referenceRepo('auth_ref'), GatewayId::generate())
         ->capture(new CaptureRequest(PaymentIntentId::generate(), $partial, $authorized, $instrument));
 
     // (gatewayId, reference, amount, clientUniqueId, authorizedAmount, instrument)

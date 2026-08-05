@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Port;
 
+use Override;
 use RuntimeException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CaptureOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CapturePort;
@@ -33,6 +34,7 @@ final readonly class OmnipayCapturePort implements CapturePort
         private GatewayId $gatewayId,
     ) {}
 
+    #[Override]
     public function capture(CaptureRequest $request): CaptureOutcome
     {
         $paymentIntentId = $request->paymentIntentId->toString();

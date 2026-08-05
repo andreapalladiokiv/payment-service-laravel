@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Service\Port;
 
+use Override;
 use Techork\PaymentService\Domain\PaymentIntent\Port\CancelPort;
 use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CancelRequest;
 
@@ -14,6 +15,7 @@ use Techork\PaymentService\Domain\PaymentIntent\Port\Request\CancelRequest;
  */
 final class ExternallyCompletedCancelPort implements CancelPort
 {
+    #[Override]
     public function cancel(CancelRequest $request): void
     {
         // gateway already cancelled — nothing to do here

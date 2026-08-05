@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Techork\PaymentService\Laravel\Webhook\Service\Port;
 
 use Money\Money;
+use Override;
 use RuntimeException;
 use Techork\PaymentService\Domain\PaymentIntent\Port\ConfirmChallengeOutcome;
 use Techork\PaymentService\Domain\PaymentIntent\Port\ConfirmChallengePort;
@@ -72,6 +73,7 @@ final readonly class ExternallyCompletedConfirmChallengePort implements ConfirmC
         return new self(null, null, null, null);
     }
 
+    #[Override]
     public function confirm(ConfirmChallengeRequest $request): ConfirmChallengeOutcome
     {
         // An announcement that a payment settled but does not name it is not a
@@ -79,7 +81,9 @@ final readonly class ExternallyCompletedConfirmChallengePort implements ConfirmC
         // afterwards, and the aggregate would be recording a charge on hearsay. Loud
         // here beats a stream that says the money moved. The refusal-only shape lands
         // here too, which is the point — it should never be asked to confirm.
-        if ($this->transactionRepository === null || $this->gatewayId === null || ($this->gatewayReference ?? '') === '') {
+        $reference = $this->gatewayReference;
+
+        if ($this->transactionRepository === null || $this->gatewayId === null || $reference === null || $reference === '') {
             throw new RuntimeException(
                 'A completed-elsewhere challenge was confirmed without a gateway reference for payment intent '
                 ."'{$request->paymentIntentId->toString()}'.",
@@ -92,7 +96,7 @@ final readonly class ExternallyCompletedConfirmChallengePort implements ConfirmC
         $this->transactionRepository->saveForPaymentIntent(
             $this->gatewayId,
             $request->paymentIntentId->toString(),
-            $this->gatewayReference,
+            $reference,
         );
 
         return ConfirmChallengeOutcome::placed($this->convertedAmount);

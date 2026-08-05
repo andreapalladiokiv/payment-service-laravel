@@ -7,6 +7,7 @@ namespace Techork\PaymentService\Laravel\Rules;
 use Closure;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Override;
 use Techork\PaymentService\Common\ValueObject\Country;
 use Techork\PaymentService\Common\ValueObject\State as StateVO;
 
@@ -21,6 +22,7 @@ final class State implements DataAwareRule, ValidationRule
 
     public function __construct(private readonly string $countryKey) {}
 
+    #[Override]
     public function setData(array $data): State
     {
         $this->data = $data;
@@ -28,6 +30,7 @@ final class State implements DataAwareRule, ValidationRule
         return $this;
     }
 
+    #[Override]
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         $country = data_get($this->data, $this->countryKey);

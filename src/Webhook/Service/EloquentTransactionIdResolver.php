@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Service;
 
+use Override;
 use Techork\PaymentService\Laravel\Models\GatewayReference;
 use Techork\PaymentService\Laravel\Repository\EloquentGatewayTransactionRepository;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
@@ -17,6 +18,7 @@ use Techork\PaymentService\Gateway\Webhook\Contract\TransactionIdResolver;
  */
 final readonly class EloquentTransactionIdResolver implements TransactionIdResolver
 {
+    #[Override]
     public function resolvePaymentIntent(GatewayId $gatewayId, string $reference): ?string
     {
         return GatewayReference::query()
@@ -26,6 +28,7 @@ final readonly class EloquentTransactionIdResolver implements TransactionIdResol
             ->value('referenceable_id');
     }
 
+    #[Override]
     public function resolveRefund(GatewayId $gatewayId, string $reference): ?string
     {
         return GatewayReference::query()

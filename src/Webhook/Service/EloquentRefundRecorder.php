@@ -6,6 +6,7 @@ namespace Techork\PaymentService\Laravel\Webhook\Service;
 
 use DomainException;
 use Money\Money;
+use Override;
 use Techork\PaymentService\Domain\PaymentIntent\PaymentIntentAggregateRepositoryInterface;
 use Techork\PaymentService\Domain\PaymentIntent\Refund\ValueObject\RefundId;
 use Techork\PaymentService\Domain\PaymentIntent\ValueObject\PaymentIntentId;
@@ -40,6 +41,7 @@ final readonly class EloquentRefundRecorder implements RefundFailureRecorder, Re
         private TransactionIdResolver $resolver,
     ) {}
 
+    #[Override]
     public function onRefundProcessed(
         GatewayId $gatewayId,
         string $paymentIntentId,
@@ -55,6 +57,7 @@ final readonly class EloquentRefundRecorder implements RefundFailureRecorder, Re
         );
     }
 
+    #[Override]
     public function onRefundFailed(
         GatewayId $gatewayId,
         string $paymentIntentId,

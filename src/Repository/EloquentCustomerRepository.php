@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Repository;
 
+use Override;
+use RuntimeException;
 use Techork\PaymentService\Common\Contract\PaymentInstrument;
 use Techork\PaymentService\Common\Contract\PaymentInstrumentVisitor;
 use Techork\PaymentService\Common\ValueObject\Cash;
@@ -19,8 +21,12 @@ use Techork\PaymentService\Laravel\Models\GatewayCustomer;
 use Techork\PaymentService\Laravel\Models\GatewayReference;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 
+/**
+ * @implements PaymentInstrumentVisitor<UuidValueObject|null>
+ */
 final class EloquentCustomerRepository implements CustomerRepository, PaymentInstrumentVisitor
 {
+    #[Override]
     public function findByInstrument(GatewayId $gatewayId, PaymentInstrument $instrument): ?string
     {
         $id = $this->resolveId($instrument);
@@ -38,6 +44,7 @@ final class EloquentCustomerRepository implements CustomerRepository, PaymentIns
             ->value('gateway_customers.customer_reference');
     }
 
+    #[Override]
     public function saveAndAttach(GatewayId $gatewayId, PaymentInstrument $instrument, string $customerReference): void
     {
         $id = $this->resolveId($instrument);
@@ -74,28 +81,33 @@ final class EloquentCustomerRepository implements CustomerRepository, PaymentIns
         return $instrument->accept($this);
     }
 
+    #[Override]
     public function visitCreditCard(CreditCard $card): null
     {
         return null;
     }
 
+    #[Override]
     public function visitCash(Cash $cash): null
     {
         return null;
     }
 
+    #[Override]
     public function visitToken(Token $token): TokenId
     {
         return $token->id;
     }
 
+    #[Override]
     public function visitPaymentMethod(PaymentMethod $paymentMethod): PaymentMethodId
     {
         return $paymentMethod->id;
     }
 
+    #[Override]
     public function visitHostedPayment(HostedPayment $hosted): never
     {
-        throw new \RuntimeException('Hosted-payment instruments are not supported in this context.');
+        throw new RuntimeException('Hosted-payment instruments are not supported in this context.');
     }
 }

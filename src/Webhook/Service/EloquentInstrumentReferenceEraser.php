@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Webhook\Service;
 
+use Override;
 use Techork\PaymentService\Gateway\Webhook\Contract\InstrumentReferenceEraser;
 use Techork\PaymentService\Common\ValueObject\PaymentMethod as PaymentMethodValueObject;
 use Techork\PaymentService\Laravel\Models\GatewayReference;
@@ -17,6 +18,7 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  */
 final readonly class EloquentInstrumentReferenceEraser implements InstrumentReferenceEraser
 {
+    #[Override]
     public function forgetPaymentMethodReference(GatewayId $gatewayId, string $reference): bool
     {
         $deleted = GatewayReference::query()

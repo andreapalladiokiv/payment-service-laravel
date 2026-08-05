@@ -57,7 +57,7 @@ function firewallApp(string $base, array $manifest, array $config = []): Applica
     $app->singleton('config', fn () => new Repository($config));
     $app->instance(PackageManifest::class, new FirewallManifestStub($manifest));
 
-    (new GatewayServiceProvider($app))->packageRegistered();
+    new GatewayServiceProvider($app)->packageRegistered();
 
     return $app;
 }

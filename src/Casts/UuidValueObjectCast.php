@@ -6,6 +6,7 @@ namespace Techork\PaymentService\Laravel\Casts;
 
 use Illuminate\Contracts\Database\Eloquent\CastsAttributes;
 use Illuminate\Database\Eloquent\Model;
+use Override;
 use Techork\PaymentService\Common\ValueObject\UuidValueObject;
 
 /**
@@ -15,24 +16,32 @@ use Techork\PaymentService\Common\ValueObject\UuidValueObject;
  *
  * @implements CastsAttributes<UuidValueObject, string>
  */
-final class UuidValueObjectCast implements CastsAttributes
+final readonly class UuidValueObjectCast implements CastsAttributes
 {
     /**
      * @param  class-string<UuidValueObject> $valueObjectClass
      */
-    public function __construct(private readonly string $valueObjectClass) {}
+    public function __construct(private string $valueObjectClass) {}
 
+    #[Override]
     public function get(Model $model, string $key, mixed $value, array $attributes): ?UuidValueObject
     {
         return $value !== null ? ($this->valueObjectClass)::fromString($value) : null;
     }
 
-    public function set(Model $model, string $key, mixed $value, array $attributes): string
+    #[Override]
+    public function set(Model $model, string $key, mixed $value, array $attributes): ?string
     {
+        // Nullable to match get(), which hands back null for an absent column. The old
+        // `string` return was a promise the null branch broke.
+        if ($value === null) {
+            return null;
+        }
+
         if ($value instanceof UuidValueObject) {
             return $value->toString();
         }
 
-        return $value;
+        return (string) $value;
     }
 }
