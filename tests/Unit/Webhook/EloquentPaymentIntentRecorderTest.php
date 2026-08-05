@@ -21,6 +21,7 @@ use Techork\PaymentService\Common\ValueObject\Token;
 use Techork\PaymentService\Common\ValueObject\TokenId;
 use Techork\PaymentService\Domain\PaymentIntent\CaptureMethod;
 use Techork\PaymentService\Domain\PaymentIntent\Event\PaymentIntentAuthorized;
+use Techork\PaymentService\Domain\PaymentIntent\Event\PaymentIntentCancelled;
 use Techork\PaymentService\Domain\PaymentIntent\Event\PaymentIntentCaptured;
 use Techork\PaymentService\Domain\PaymentIntent\Event\PaymentIntentFailed;
 use Techork\PaymentService\Domain\PaymentIntent\Event\PaymentIntentRequiresAction;
@@ -102,12 +103,12 @@ function recorderRequiresActionEvent(CaptureMethod $captureMethod = CaptureMetho
     );
 }
 
-function recorderAuthorizedEvent(): PaymentIntentAuthorized
+function recorderAuthorizedEvent(CaptureMethod $captureMethod = CaptureMethod::Automatic): PaymentIntentAuthorized
 {
     return new PaymentIntentAuthorized(
         recorderAmount(),
         recorderInstrument(),
-        CaptureMethod::Automatic,
+        $captureMethod,
         recorderBillingAddress(),
         [],
         new MerchantDescriptor('ACME STORE'),
@@ -260,6 +261,7 @@ it('reports NotFound for an intent with no history', function () {
     expect($recorder->onGatewaySuccess($this->gatewayId, $this->intentId, 'gw-ref', recorderAmount()))->toBe(RecorderOutcome::NotFound)
         ->and($recorder->onGatewayAuthorization($this->gatewayId, $this->intentId, 'gw-ref'))->toBe(RecorderOutcome::NotFound)
         ->and($recorder->onGatewayFailure($this->intentId, 'whatever'))->toBe(RecorderOutcome::NotFound)
+        ->and($recorder->onGatewayCancellation($this->intentId))->toBe(RecorderOutcome::NotFound)
         ->and($intents->persistCount)->toBe(0);
 });
 
@@ -290,4 +292,67 @@ it('refuses to confirm through the port kept for refusals', function () {
         CaptureMethod::Automatic,
         recorderBillingAddress(),
     )))->toThrow(RuntimeException::class, 'without a gateway reference');
+});
+
+it('records a cancellation the gateway made on its own', function () {
+    $intents = recorderPaymentIntentRepository([recorderAuthorizedEvent()]);
+    $transactions = recorderTransactionRepository();
+
+    $outcome = new EloquentPaymentIntentRecorder($intents, $transactions)
+        ->onGatewayCancellation($this->intentId);
+
+    expect($outcome)->toBe(RecorderOutcome::Applied)
+        ->and($intents->recorded[0])->toBeInstanceOf(PaymentIntentCancelled::class)
+        // Nothing was placed and nothing settled, so there is no reference to record.
+        ->and($transactions->saved)->toBe([]);
+});
+
+it('skips a cancellation the aggregate refuses', function () {
+    // Money already moved: the gateway may say it cancelled, but the event stream is the
+    // source of truth and it will not record a cancellation over a capture.
+    $intents = recorderPaymentIntentRepository([recorderAuthorizedEvent(), new PaymentIntentCaptured(recorderAmount())]);
+
+    $outcome = new EloquentPaymentIntentRecorder($intents, recorderTransactionRepository())
+        ->onGatewayCancellation($this->intentId);
+
+    expect($outcome)->toBe(RecorderOutcome::Skipped)
+        ->and($intents->persistCount)->toBe(0);
+});
+
+it('skips a capture the aggregate refuses', function () {
+    // An immediate-capture intent has nothing to capture in a second step. The recorder
+    // swallows that refusal rather than letting a webhook fail: the gateway is telling us
+    // about money that the inline charge already recorded.
+    $intents = recorderPaymentIntentRepository([recorderAuthorizedEvent(CaptureMethod::Immediate)]);
+    $transactions = recorderTransactionRepository();
+
+    $outcome = new EloquentPaymentIntentRecorder($intents, $transactions)
+        ->onGatewaySuccess($this->gatewayId, $this->intentId, 'gw-ref-5', recorderAmount());
+
+    expect($outcome)->toBe(RecorderOutcome::Skipped)
+        ->and($intents->persistCount)->toBe(0)
+        // The reference must not be written for a transition that was not recorded.
+        ->and($transactions->saved)->toBe([]);
+});
+
+it('skips a success announcement for a state neither branch handles', function () {
+    $intents = recorderPaymentIntentRepository([recorderAuthorizedEvent(), new PaymentIntentCaptured(recorderAmount())]);
+    $transactions = recorderTransactionRepository();
+
+    $outcome = new EloquentPaymentIntentRecorder($intents, $transactions)
+        ->onGatewaySuccess($this->gatewayId, $this->intentId, 'gw-ref-6', recorderAmount());
+
+    expect($outcome)->toBe(RecorderOutcome::Skipped)
+        ->and($intents->persistCount)->toBe(0)
+        ->and($transactions->saved)->toBe([]);
+});
+
+it('skips a refusal for an intent that was already resolved inline', function () {
+    $intents = recorderPaymentIntentRepository([recorderAuthorizedEvent()]);
+
+    $outcome = new EloquentPaymentIntentRecorder($intents, recorderTransactionRepository())
+        ->onGatewayFailure($this->intentId, 'issuer declined');
+
+    expect($outcome)->toBe(RecorderOutcome::Skipped)
+        ->and($intents->persistCount)->toBe(0);
 });
