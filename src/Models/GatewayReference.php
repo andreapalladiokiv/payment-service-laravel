@@ -21,7 +21,7 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  * @property string|null $failure_reason
  * @property array|null $metadata JSON-encoded gateway-specific transaction attributes
  */
-class GatewayReference extends Model
+final class GatewayReference extends Model
 {
     use HasUuids;
 

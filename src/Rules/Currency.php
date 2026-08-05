@@ -13,7 +13,7 @@ use Money\Currencies\CryptoCurrencies;
 use Money\Currencies\ISOCurrencies;
 use Override;
 
-readonly class Currency implements ValidationRule
+final readonly class Currency implements ValidationRule
 {
     public const string ISO = 'iso';
     public const string CRYPTO = 'crypto';

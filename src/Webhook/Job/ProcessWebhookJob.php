@@ -25,7 +25,7 @@ use Throwable;
  *
  * @property WebhookCall $webhookCall
  */
-class ProcessWebhookJob extends SpatieProcessWebhookJob
+final class ProcessWebhookJob extends SpatieProcessWebhookJob
 {
     public function handle(WebhookRouter $router): void
     {

@@ -10,7 +10,7 @@ use InvalidArgumentException;
 use Override;
 use Symfony\Component\Intl\Countries;
 
-class Country implements ValidationRule
+final class Country implements ValidationRule
 {
     public const string ALPHA2 = 'alpha2';
 

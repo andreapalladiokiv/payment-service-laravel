@@ -18,7 +18,7 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  * @property string $gateway_name
  * @property array<string, string> $credentials
  */
-class Gateway extends Model implements GatewayCredential
+final class Gateway extends Model implements GatewayCredential
 {
     use HasUuids;
 

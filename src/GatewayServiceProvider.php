@@ -75,7 +75,7 @@ use Techork\PaymentService\Laravel\Shredding\PiiStore;
 use Techork\PaymentService\Gateway\Logger\GatewayLoggerInterface;
 use Techork\PaymentService\Gateway\PaymentGatewayRouter;
 
-class GatewayServiceProvider extends PackageServiceProvider
+final class GatewayServiceProvider extends PackageServiceProvider
 {
     public $singletons = [
         GatewayCredentialRepository::class => EloquentGatewayCredentialRepository::class,

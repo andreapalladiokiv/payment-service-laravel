@@ -35,7 +35,7 @@ use Throwable;
  * @property WebhookCallStatus $status
  * @property Carbon|null $processed_at
  */
-class WebhookCall extends SpatieWebhookCall
+final class WebhookCall extends SpatieWebhookCall
 {
     use HasUuids;
 
