@@ -85,12 +85,12 @@ function challengeNormalizerSerializer(?PiiStore $store = null, bool $challengeF
 //  Round trip — every Challenge implementation in the repo
 // ─────────────────────────────────────────────────────────
 
-it('round-trips a direct-MPI ThreeDSChallenge (acsUrl + creq)', function () {
+it('round-trips a step that carries a payload to post', function () {
     $serializer = challengeNormalizerSerializer();
     $original = new ThreeDSChallenge(
-        transactionId: 'txn-3ds-1',
-        acsUrl: 'https://acs.example.test/challenge',
-        creq: 'eyJ0aHJlZURTU2VydmVyVHJhbnNJRCI6ImFiYyJ9',
+        authenticationId: 'txn-3ds-1',
+        url: 'https://acs.example.test/challenge',
+        payload: 'eyJ0aHJlZURTU2VydmVyVHJhbnNJRCI6ImFiYyJ9',
     );
 
     $rebuilt = $serializer->denormalize($serializer->normalize($original), Challenge::class);
@@ -98,26 +98,25 @@ it('round-trips a direct-MPI ThreeDSChallenge (acsUrl + creq)', function () {
     expect($rebuilt)->toEqual($original);
 });
 
-it('round-trips an SDK-mode ThreeDSChallenge (acsUrl + clientSecret, no creq)', function () {
+it('round-trips a step with no payload', function () {
     // The two integration shapes the VO documents differ only in which nullable
     // fields are populated; both have to survive, nulls included.
     $serializer = challengeNormalizerSerializer();
     $original = new ThreeDSChallenge(
-        transactionId: 'txn-3ds-2',
-        acsUrl: 'https://acs.example.test/challenge',
-        clientSecret: 'pi_123_secret_456',
+        authenticationId: 'txn-3ds-2',
+        url: 'https://acs.example.test/challenge',
     );
 
     $rebuilt = $serializer->denormalize($serializer->normalize($original), Challenge::class);
 
     expect($rebuilt)->toEqual($original)
-        ->and($rebuilt->creq)->toBeNull();
+        ->and($rebuilt->payload)->toBeNull();
 });
 
 it('round-trips a ThreeDSChallenge that carries nothing but a transaction id', function () {
     // Every optional field defaulted: the minimum a gateway can hand back.
     $serializer = challengeNormalizerSerializer();
-    $original = new ThreeDSChallenge(transactionId: 'txn-3ds-3');
+    $original = new ThreeDSChallenge('txn-3ds-3', 'https://acs.test/step');
 
     expect($serializer->denormalize($serializer->normalize($original), Challenge::class))
         ->toEqual($original);
@@ -159,21 +158,21 @@ it('stamps the type discriminator each concrete challenge is stored under', func
     // stream, so they are a compatibility contract with every already-stored row.
     $serializer = challengeNormalizerSerializer();
 
-    expect($serializer->normalize(new ThreeDSChallenge('txn-1'))['type'])->toBe('3ds')
+    expect($serializer->normalize(new ThreeDSChallenge('txn-1', 'https://acs.test/step'))['type'])->toBe('3ds')
         ->and($serializer->normalize(new RedirectChallenge('txn-2', 'https://x.test', []))['type'])
         ->toBe('redirect');
 });
 
 it('keeps the challenge fields alongside the discriminator', function () {
     $payload = challengeNormalizerSerializer()->normalize(
-        new ThreeDSChallenge('txn-1', 'https://acs.test', 'creq-blob', 'secret'),
+        new ThreeDSChallenge('txn-1', 'https://acs.test', 'creq-blob'),
     );
 
     expect($payload)->toBe([
-        'transactionId' => 'txn-1',
-        'acsUrl' => 'https://acs.test',
-        'creq' => 'creq-blob',
-        'clientSecret' => 'secret',
+        'authenticationId' => 'txn-1',
+        'url' => 'https://acs.test',
+        'payload' => 'creq-blob',
+        'protocolVersion' => '2.2.0',
         'type' => '3ds',
     ]);
 });
@@ -197,7 +196,7 @@ it('treats no challenge field as PII', function () {
 it('refuses to denormalize a payload with no type key', function () {
     // Without a discriminator there is no way to pick a class, and guessing would
     // produce a challenge the gateway never issued.
-    expect(fn () => challengeNormalizerSerializer()->denormalize(['transactionId' => 'txn-1'], Challenge::class))
+    expect(fn () => challengeNormalizerSerializer()->denormalize(['authenticationId' => 'txn-1'], Challenge::class))
         ->toThrow(InvalidArgumentException::class, 'missing or unknown "type" key (NULL)');
 });
 
@@ -219,7 +218,7 @@ it('names the offending value in the failure so a bad stored row can be found', 
 it('claims normalization for challenges only', function () {
     $normalizer = new ChallengeNormalizer(challengeNormalizerTestPiiAware());
 
-    expect($normalizer->supportsNormalization(new ThreeDSChallenge('txn-1')))->toBeTrue()
+    expect($normalizer->supportsNormalization(new ThreeDSChallenge('txn-1', 'https://acs.test/step')))->toBeTrue()
         ->and($normalizer->supportsNormalization(new RedirectChallenge('txn-1', 'https://x.test', [])))->toBeTrue()
         ->and($normalizer->supportsNormalization(new Cash))->toBeFalse()
         ->and($normalizer->supportsNormalization(['type' => '3ds']))->toBeFalse()
@@ -264,7 +263,7 @@ it('loses the discriminator when the PII normalizer is placed first', function (
 it('resolves the interface that the inner normalizer cannot instantiate', function () {
     // The failure the normalizer exists to prevent: handed `Challenge::class`
     // directly, the reflection-based normalizer tries to instantiate the interface.
-    $payload = ['transactionId' => 'txn-1', 'acsUrl' => 'https://acs.test', 'type' => '3ds'];
+    $payload = ['authenticationId' => 'txn-1', 'url' => 'https://acs.test', 'type' => '3ds'];
 
     expect(fn () => challengeNormalizerTestPiiAware()->denormalize($payload, Challenge::class))
         ->toThrow(NotNormalizableValueException::class, 'is not instantiable');

@@ -396,7 +396,7 @@ it('claims normalization for payment instruments only', function () {
 
     expect($normalizer->supportsNormalization(new Cash))->toBeTrue()
         ->and($normalizer->supportsNormalization(instrumentNormalizerCard()))->toBeTrue()
-        ->and($normalizer->supportsNormalization(new ThreeDSChallenge('txn-1')))->toBeFalse()
+        ->and($normalizer->supportsNormalization(new ThreeDSChallenge('txn-1', 'https://acs.test/step')))->toBeFalse()
         ->and($normalizer->supportsNormalization(instrumentNormalizerBillingAddress()))->toBeFalse()
         ->and($normalizer->supportsNormalization(['type' => 'card']))->toBeFalse()
         ->and($normalizer->supportsNormalization(null))->toBeFalse();

@@ -215,7 +215,7 @@ it('claims normalization for challenge results only', function () {
 
     expect($normalizer->supportsNormalization($result))->toBeTrue()
         ->and($normalizer->supportsNormalization(new RedirectResult('txn-1')))->toBeTrue()
-        ->and($normalizer->supportsNormalization(new ThreeDSChallenge('txn-1')))->toBeFalse()
+        ->and($normalizer->supportsNormalization(new ThreeDSChallenge('txn-1', 'https://acs.test/step')))->toBeFalse()
         ->and($normalizer->supportsNormalization(['type' => '3ds']))->toBeFalse();
 });
 
@@ -245,7 +245,7 @@ it('keeps the 3ds token disambiguated by target interface, not by the token itse
     $serializer = challengeResultNormalizerSerializer();
 
     $asChallenge = $serializer->denormalize(
-        ['transactionId' => 'txn-1', 'type' => '3ds'],
+        ['authenticationId' => 'txn-1', 'url' => 'https://acs.test/step', 'type' => '3ds'],
         Challenge::class,
     );
     $asResult = $serializer->denormalize(
