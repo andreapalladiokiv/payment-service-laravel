@@ -13,6 +13,7 @@ use Techork\PaymentService\Gateway\Contract\GatewayCredentialRepository;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 use Techork\PaymentService\Gateway\Webhook\Contract\EventParser;
 use Techork\PaymentService\Gateway\Webhook\Contract\ParsedEvent;
+use Techork\PaymentService\Gateway\Webhook\Contract\InboundWebhook;
 use Techork\PaymentService\Gateway\Webhook\Contract\SignatureVerifier;
 use Techork\PaymentService\Gateway\Webhook\HandlerRegistry;
 use Techork\PaymentService\Gateway\Webhook\VerifierRegistry;
@@ -113,16 +114,16 @@ function webhookAdapterRouter(array $credentials, ArrayObject $seen, ?array $ins
             $kind,
             new class($seen) implements SignatureVerifier
             {
-                /** @param ArrayObject<int, ServerRequestInterface> $seen */
+                /** @param ArrayObject<int, InboundWebhook> $seen */
                 public function __construct(private readonly ArrayObject $seen) {}
 
-                public function verify(ServerRequestInterface $request, GatewayCredential $gateway): bool
+                public function verify(InboundWebhook $webhook, GatewayCredential $gateway): bool
                 {
-                    $this->seen[] = $request;
+                    $this->seen[] = $webhook;
 
                     return hash_equals(
-                        hash_hmac('sha256', (string) $request->getBody(), $gateway->getCredentials()['webhook_secret']),
-                        $request->getHeaderLine('Signature'),
+                        hash_hmac('sha256', $webhook->body, $gateway->getCredentials()['webhook_secret']),
+                        $webhook->header('Signature'),
                     );
                 }
             },
@@ -268,11 +269,11 @@ it('rejects a delivery whose body was altered after signing', function () {
     expect($adapter->isValid(webhookAdapterRequest($altered, $signature), webhookAdapterConfig()))->toBeFalse();
 });
 
-it('hands the verifier a PSR-7 request that still carries the method, uri and bodies', function () {
+it('hands the verifier a webhook that still carries the method, uri and bodies', function () {
     // The match above already proves the raw body and the signature header survived. This pins
-    // the rest of the request the verifiers are documented to work from — several providers
-    // sign over the path or read a second header — so the bridge cannot be silently narrowed
-    // to "body plus one header".
+    // the rest of what the verifiers are documented to work from — several providers sign over
+    // the path or read a second header — so neither the bridge nor the value type that replaced
+    // the PSR-7 request can be silently narrowed to "body plus one header".
     $adapter = new SpatieSignatureValidatorAdapter(
         webhookAdapterRouter([webhookAdapterCredential('stripe', $this->secret)], $this->seen),
         webhookAdapterFactory(),
@@ -283,16 +284,16 @@ it('hands the verifier a PSR-7 request that still carries the method, uri and bo
         webhookAdapterConfig(),
     );
 
-    $psr = $this->seen[0];
+    $webhook = $this->seen[0];
 
-    expect($psr)->toBeInstanceOf(ServerRequestInterface::class)
-        ->and($psr->getMethod())->toBe('POST')
-        ->and((string) $psr->getUri())->toBe('https://app.test/webhooks/payments')
-        ->and((string) $psr->getBody())->toBe($this->body)
-        // The parsed body is what the router hands the parser to extract the idempotency key;
-        // losing it would produce a match with an empty external id, which the dedup index
+    expect($webhook)->toBeInstanceOf(InboundWebhook::class)
+        ->and($webhook->method)->toBe('POST')
+        ->and($webhook->uri)->toBe('https://app.test/webhooks/payments')
+        ->and($webhook->body)->toBe($this->body)
+        // The fields are what the router hands the parser to extract the idempotency key;
+        // losing them would produce a match with an empty external id, which the dedup index
         // would then read as the same event every time.
-        ->and($psr->getParsedBody())->toBe(['id' => 'evt_1', 'type' => 'charge.succeeded']);
+        ->and($webhook->fields())->toBe(['id' => 'evt_1', 'type' => 'charge.succeeded']);
 });
 
 it('stashes the kind and tenant of whichever candidate signed it', function () {

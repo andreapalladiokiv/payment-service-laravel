@@ -13,6 +13,7 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 use Techork\PaymentService\Gateway\Webhook\Contract\EventParser;
 use Techork\PaymentService\Gateway\Webhook\Contract\HandlerOutcome;
 use Techork\PaymentService\Gateway\Webhook\Contract\ParsedEvent;
+use Techork\PaymentService\Gateway\Webhook\Contract\InboundWebhook;
 use Techork\PaymentService\Gateway\Webhook\Contract\SignatureVerifier;
 use Techork\PaymentService\Gateway\Webhook\Contract\WebhookEventHandler;
 use Techork\PaymentService\Gateway\Webhook\Contract\WebhookSubscriber;
@@ -83,7 +84,7 @@ final class WiringWebhookSubscriber implements WebhookSubscriber
 
         $verifiers->register('Wiring', new class implements SignatureVerifier
         {
-            public function verify(ServerRequestInterface $request, GatewayCredential $gateway): bool
+            public function verify(InboundWebhook $webhook, GatewayCredential $gateway): bool
             {
                 return true;
             }
