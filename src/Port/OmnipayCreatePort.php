@@ -24,10 +24,24 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  */
 final readonly class OmnipayCreatePort implements CreatePort
 {
+    /**
+     * @param  ?string  $returnUrl  Where the gateway brings the cardholder back after an
+     *   authentication it hosts. Bound to the port for the same reason the gateway id is:
+     *   both are decided by the caller's own routing, and neither is a fact the payment
+     *   intent has any use for — putting it on {@see CreateRequest} would push it through
+     *   the aggregate and add a method to a command interface every host implements, to
+     *   carry a value the domain never reads.
+     *
+     *   Null means there is nowhere to come back to, which is the honest answer for a
+     *   server-to-server call. With Stripe that decides the shape of a 3DS step-up: given
+     *   an address it answers `redirect_to_url`, and given none it can only offer
+     *   `use_stripe_sdk`, which no gateway-agnostic caller can present.
+     */
     public function __construct(
         private PaymentGatewayInterface $gateway,
         private GatewayTransactionRepository $transactionRepository,
         private GatewayId $gatewayId,
+        private ?string $returnUrl = null,
     ) {}
 
     #[Override]
@@ -37,8 +51,8 @@ final readonly class OmnipayCreatePort implements CreatePort
         $threeDS = $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null;
 
         $result = $request->captureMethod === CaptureMethod::Immediate
-            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation)
-            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation);
+            ? $this->gateway->charge($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation, returnUrl: $this->returnUrl)
+            : $this->gateway->authorize($this->gatewayId, $request->instrument, $request->amount, $clientUniqueId, $request->billingAddress, $threeDS, initiation: $request->initiation, returnUrl: $this->returnUrl);
 
         if ($result->reference !== null) {
             $this->transactionRepository->saveForPaymentIntent($this->gatewayId, $clientUniqueId, $result->reference, $result->metadata);
