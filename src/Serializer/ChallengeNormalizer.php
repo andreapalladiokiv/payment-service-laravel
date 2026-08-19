@@ -12,6 +12,7 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Techork\PaymentService\Common\Contract\Challenge;
 use Techork\PaymentService\Common\Contract\ChallengeVisitor;
 use Techork\PaymentService\Common\ValueObject\Challenge\RedirectChallenge;
+use Techork\PaymentService\Common\ValueObject\Challenge\SdkChallenge;
 use Techork\PaymentService\Common\ValueObject\Challenge\ThreeDSChallenge;
 use function sprintf;
 
@@ -40,6 +41,8 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
     private const string TYPE_THREEDS = '3ds';
 
     private const string TYPE_REDIRECT = 'redirect';
+
+    private const string TYPE_SDK = 'sdk';
 
     private ?string $format = null;
 
@@ -70,6 +73,7 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
         $concreteType = match ($data['type'] ?? null) {
             self::TYPE_THREEDS => ThreeDSChallenge::class,
             self::TYPE_REDIRECT => RedirectChallenge::class,
+            self::TYPE_SDK => SdkChallenge::class,
             default => throw new InvalidArgumentException(sprintf(
                 'Cannot denormalize Challenge: missing or unknown "type" key (%s).',
                 var_export($data['type'] ?? null, true),
@@ -106,6 +110,12 @@ final class ChallengeNormalizer implements ChallengeVisitor, DenormalizerInterfa
     public function visitRedirect(RedirectChallenge $challenge): array
     {
         return $this->serialize($challenge, self::TYPE_REDIRECT);
+    }
+
+    #[Override]
+    public function visitSdk(SdkChallenge $challenge): array
+    {
+        return $this->serialize($challenge, self::TYPE_SDK);
     }
 
     /**
