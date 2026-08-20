@@ -7,7 +7,6 @@ namespace Techork\PaymentService\Laravel\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Techork\PaymentService\Laravel\Casts\UuidValueObjectCast;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
@@ -42,13 +41,4 @@ final class GatewayReference extends Model
         return $this->morphTo();
     }
 
-    public function customers(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            GatewayCustomer::class,
-            'gateway_reference_customer',
-            'gateway_reference_id',
-            'gateway_customer_id',
-        );
-    }
 }
