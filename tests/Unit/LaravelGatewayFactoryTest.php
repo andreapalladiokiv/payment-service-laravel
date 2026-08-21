@@ -6,7 +6,6 @@ use Illuminate\Config\Repository as ConfigRepository;
 use Illuminate\Foundation\Application;
 use Omnipay\Common\AbstractGateway;
 use Omnipay\Common\Message\RequestInterface;
-use Techork\PaymentService\Gateway\Contract\CustomerIdentitySource;
 use Techork\PaymentService\Gateway\Contract\GatewayCustomerRepository;
 use Techork\PaymentService\Gateway\Contract\ResolvesGatewayCustomers;
 use Techork\PaymentService\Gateway\Contract\Gateway as GatewayContract;
@@ -49,8 +48,6 @@ final class LaravelGatewayFactoryProbeGateway extends AbstractGateway implements
     public string $bakedBaseUrl = '';
 
     public function setGatewayCustomerRepository(GatewayCustomerRepository $repository): void {}
-
-    public function setCustomerIdentitySource(CustomerIdentitySource $source): void {}
 
     public function getName(): string
     {

@@ -36,7 +36,6 @@ use Techork\PaymentService\Domain\Subscription\SubscriptionAggregateRepositoryIn
 use Techork\PaymentService\Firewall\Dsl\FactSchema;
 use Techork\PaymentService\Firewall\Dsl\RuleCompiler;
 use Techork\PaymentService\Firewall\Dsl\RuleEvaluator;
-use Techork\PaymentService\Gateway\Contract\CustomerIdentitySource;
 use Techork\PaymentService\Gateway\Contract\GatewayCustomerRepository;
 use Techork\PaymentService\Gateway\Contract\Gateway;
 use Techork\PaymentService\Gateway\Contract\GatewayCredentialRepository;
@@ -163,7 +162,6 @@ final class GatewayServiceProvider extends PackageServiceProvider
                 // Bound by the host: only it can say who a customer is. Absent, the adapters
                 // fall back to building a provider-side customer from the payment's address,
                 // which is the behaviour this whole change exists to end.
-                $app->bound(CustomerIdentitySource::class) ? $app->make(CustomerIdentitySource::class) : null,
             );
             $factory->replace($this->discoverGateways($manifest));
             Omnipay::setFactory($factory);

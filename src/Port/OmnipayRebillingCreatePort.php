@@ -54,11 +54,20 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
  */
 final readonly class OmnipayRebillingCreatePort implements CreatePort
 {
+    /**
+     * @param  ?string  $customerId  Whose subscription this renews.
+     *
+     * On the port for the reason {@see OmnipayCreatePort} gives — the domain does not know that
+     * providers have customers — and it matters more here than anywhere: Nuvei renews through a
+     * `userPaymentOptionId`, which exists only under a `userTokenId`, so a renewal with no
+     * customer named cannot use the stored instrument at all.
+     */
     public function __construct(
         private PaymentGatewayInterface $gateway,
         private GatewayTransactionRepository $transactionRepository,
         private GatewayId $gatewayId,
         private ?PaymentIntentId $genesisPaymentIntentId,
+        private ?string $customerId = null,
     ) {}
 
     #[Override]
@@ -102,6 +111,7 @@ final readonly class OmnipayRebillingCreatePort implements CreatePort
             $clientUniqueId,
             $request->billingAddress,
             $request->challengeResult instanceof ThreeDSResult ? $request->challengeResult : null,
+            customerId: $this->customerId,
         );
 
         if ($result->reference !== null) {
