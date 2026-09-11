@@ -23,12 +23,18 @@ final readonly class EloquentGatewayCredentialRepository implements GatewayCrede
     #[Override]
     public function findOrFail(GatewayId $gatewayId): GatewayCredential
     {
-        return $this->modelClass::query()->findOrFail($gatewayId->toString());
+        /** @var Model&GatewayCredential $model */
+        $model = $this->modelClass::query()->findOrFail($gatewayId->toString());
+
+        return $model;
     }
 
     #[Override]
     public function all(): iterable
     {
-        return $this->modelClass::query()->cursor();
+        /** @var iterable<Model&GatewayCredential> $models */
+        $models = $this->modelClass::query()->cursor();
+
+        return $models;
     }
 }
