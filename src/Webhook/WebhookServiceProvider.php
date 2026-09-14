@@ -11,6 +11,7 @@ use Illuminate\Support\ServiceProvider;
 use Nyholm\Psr7\Factory\Psr17Factory;
 use Override;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
+use Techork\PaymentService\Laravel\Webhook\Service\EloquentDisputeRecorder;
 use Techork\PaymentService\Laravel\Webhook\Service\EloquentInstrumentReferenceEraser;
 use Techork\PaymentService\Laravel\Webhook\Service\EloquentPaymentIntentRecorder;
 use Techork\PaymentService\Laravel\Webhook\Service\EloquentRefundRecorder;
@@ -21,6 +22,7 @@ use Techork\PaymentService\Gateway\Webhook\Contract\WebhookSubscriber;
 use Techork\PaymentService\Gateway\Webhook\HandlerRegistry;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayAuthorizationRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayCancellationRecorder;
+use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayDisputeRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayFailureRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentMethodRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewaySuccessRecorder;
@@ -81,6 +83,12 @@ final class WebhookServiceProvider extends ServiceProvider
 
         $this->app->bind(RefundProcessingRecorder::class, EloquentRefundRecorder::class);
         $this->app->bind(RefundFailureRecorder::class, EloquentRefundRecorder::class);
+
+        // The dispute recorder, and the reason every webhook in the tree depended on it existing:
+        // `discoverSubscribers()` resolves each discovered subscriber, and the Stripe one requires
+        // three dispute handlers that each require this interface. Without a binding here the first
+        // resolution of VerifierRegistry or HandlerRegistry throws, for every provider at once.
+        $this->app->bind(GatewayDisputeRecorder::class, EloquentDisputeRecorder::class);
 
         // FeeRecorder has no bridge default — VirtualCard storage is
         // application-defined, so the consuming app binds its own

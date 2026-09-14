@@ -11,7 +11,8 @@ use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 
 /**
  * Backs {@see GatewayTransactionRepository} via the polymorphic
- * {@see GatewayReference} table with morph types `payment_intent` and `refund`.
+ * {@see GatewayReference} table with morph types `payment_intent`, `refund` and
+ * `dispute`.
  *
  * Semantics: one row per (gateway, aggregate) — writes overwrite on transition
  * (e.g. PaymentIntent auth-ref → charge-ref on capture).
@@ -21,6 +22,26 @@ final readonly class EloquentGatewayTransactionRepository implements GatewayTran
     public const string TYPE_PAYMENT_INTENT = 'payment_intent';
 
     public const string TYPE_REFUND = 'refund';
+
+    /**
+     * The morph type a dispute's provider reference is stored under.
+     *
+     * A plain string column with no enum constraint and no morph map registered, which is why this
+     * is the whole of the schema change a dispute needs: nothing migrates. The row is written by
+     * A0's {@see \Techork\PaymentService\Gateway\Webhook\Recorder\GatewayDisputeRecorder}
+     * implementation when a case is observed — the aggregate no longer carries the provider's
+     * reference, so the recorder is the one place that holds both halves at once — and it is read
+     * in both directions: by our aggregate id, from the four dispute port adapters, and by the
+     * provider's reference, from
+     * {@see \Techork\PaymentService\Laravel\Webhook\Service\EloquentTransactionIdResolver::resolveDispute()},
+     * which is how a resolution addressed by the provider's own name reaches its aggregate.
+     *
+     * The one thing this type forbids is asking the row for its `referenceable()`. With no morph
+     * map entry, `MorphTo` would look for a class named after this string and fail — every reader
+     * of a dispute reference queries the table by `referenceable_type` and `reference` instead,
+     * which is what the resolver above does.
+     */
+    public const string TYPE_DISPUTE = 'dispute';
 
     public function __construct(private string $modelClass = GatewayReference::class)
     {
@@ -54,6 +75,18 @@ final readonly class EloquentGatewayTransactionRepository implements GatewayTran
     public function saveForRefund(GatewayId $gatewayId, string $refundId, string $reference): void
     {
         $this->save($gatewayId, self::TYPE_REFUND, $refundId, $reference);
+    }
+
+    #[Override]
+    public function findForDispute(string $disputeId): ?string
+    {
+        return $this->find(self::TYPE_DISPUTE, $disputeId);
+    }
+
+    #[Override]
+    public function saveForDispute(GatewayId $gatewayId, string $disputeId, string $reference): void
+    {
+        $this->save($gatewayId, self::TYPE_DISPUTE, $disputeId, $reference);
     }
 
     private function find(string $referenceableType, string $referenceableId): ?string

@@ -151,6 +151,17 @@ function refundRecorderIntents(array $events): PaymentIntentAggregateRepositoryI
     };
 }
 
+/**
+ * The reference table this file's recorder writes refunds through, as a fake.
+ *
+ * It now implements the whole of {@see GatewayTransactionRepository}, dispute pair included, and the
+ * two dispute methods are answers rather than behaviours on purpose: **nothing in this file is about
+ * disputes.** They answer `null` and do nothing because that is what the real table answers for a
+ * case it holds no row for, and a dispute reference is not something a refund recorder can ever be
+ * given — a fake that threw here would turn a future, legitimate widening of the interface into a
+ * failure in a file that never asked about it. The refund pair above is where this fake's honesty
+ * matters, and it is the pair the assertions read.
+ */
 function refundRecorderTransactions(): GatewayTransactionRepository
 {
     return new class implements GatewayTransactionRepository
@@ -179,6 +190,14 @@ function refundRecorderTransactions(): GatewayTransactionRepository
         {
             $this->savedRefunds[] = ['refund' => $refundId, 'reference' => $reference];
         }
+
+        /** No dispute rows here — see the docblock above for why this answers rather than refuses. */
+        public function findForDispute(string $disputeId): ?string
+        {
+            return null;
+        }
+
+        public function saveForDispute(GatewayId $gatewayId, string $disputeId, string $reference): void {}
     };
 }
 

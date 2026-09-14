@@ -8,7 +8,10 @@ use Illuminate\Foundation\PackageManifest;
 use Illuminate\Http\Request;
 use Psr\Http\Message\ServerRequestInterface;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
+use Techork\PaymentService\Domain\Dispute\DisputeAggregateRepositoryInterface;
+use Techork\PaymentService\Domain\PaymentIntent\PaymentIntentAggregateRepositoryInterface;
 use Techork\PaymentService\Gateway\Contract\GatewayCredential;
+use Techork\PaymentService\Gateway\Contract\GatewayTransactionRepository;
 use Techork\PaymentService\Gateway\ValueObject\GatewayId;
 use Techork\PaymentService\Gateway\Webhook\Contract\EventParser;
 use Techork\PaymentService\Gateway\Webhook\Contract\HandlerOutcome;
@@ -18,10 +21,12 @@ use Techork\PaymentService\Gateway\Webhook\Contract\SignatureVerifier;
 use Techork\PaymentService\Gateway\Webhook\Contract\WebhookEventHandler;
 use Techork\PaymentService\Gateway\Webhook\Contract\WebhookSubscriber;
 use Techork\PaymentService\Gateway\Webhook\HandlerRegistry;
+use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayDisputeRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\GatewayPaymentMethodRecorder;
 use Techork\PaymentService\Gateway\Webhook\Recorder\NoOpGatewayPaymentMethodRecorder;
 use Techork\PaymentService\Gateway\Webhook\VerifierRegistry;
 use Techork\PaymentService\Gateway\Webhook\WebhookRouter;
+use Techork\PaymentService\Laravel\Webhook\Service\EloquentDisputeRecorder;
 use Techork\PaymentService\Laravel\Webhook\WebhookServiceProvider;
 
 /**
@@ -278,4 +283,32 @@ it('defaults payment-method recording to the no-op the bridge owns', function ()
     // that a BindingResolutionException on a webhook nobody asked to handle.
     expect(webhookProviderApp([])->make(GatewayPaymentMethodRecorder::class))
         ->toBeInstanceOf(NoOpGatewayPaymentMethodRecorder::class);
+});
+
+it('binds the dispute recorder, which is what every webhook in the tree depends on', function () {
+    // This one line is load-bearing far beyond disputes, and its absence is not a dispute
+    // outage: discovery resolves every subscriber in the manifest inside the
+    // VerifierRegistry / HandlerRegistry singletons, and the Stripe subscriber's constructor
+    // takes three dispute handlers that each take this interface — so without the binding the
+    // first resolution of either registry threw for **every gateway at once**, and no webhook
+    // of any provider could be verified or dispatched.
+    //
+    // Asserted against a real container because that is where it went wrong: the class names
+    // were all present and correct, and `ContainerBindingsTest` already reads this provider's
+    // bindings statically — it would have passed the whole time. What it cannot see is whether
+    // the name is in the container, which is the thing the subscribers ask.
+    //
+    // Resolved for real rather than read out of `getBindings()`: Laravel stores a string
+    // binding wrapped in its own builder closure, so the declared class name is not
+    // recoverable from there — and asking the container for the interface is exactly what a
+    // subscriber's constructor does. Its three collaborators are stubbed because *they* are
+    // wired by `GatewayServiceProvider` from config and a connection; they are not the
+    // subject, and the subject is the alias this provider owes.
+    $app = webhookProviderApp([]);
+    $app->instance(PaymentIntentAggregateRepositoryInterface::class, Mockery::mock(PaymentIntentAggregateRepositoryInterface::class));
+    $app->instance(DisputeAggregateRepositoryInterface::class, Mockery::mock(DisputeAggregateRepositoryInterface::class));
+    $app->instance(GatewayTransactionRepository::class, Mockery::mock(GatewayTransactionRepository::class));
+
+    expect($app->bound(GatewayDisputeRecorder::class))->toBeTrue()
+        ->and($app->make(GatewayDisputeRecorder::class))->toBeInstanceOf(EloquentDisputeRecorder::class);
 });
