@@ -61,6 +61,9 @@ final readonly class PayloadSerializerFactory
             new UuidNormalizer,
             new PhoneNumberNormalizer,
             new StateNormalizer,
+            // Stores nothing. PCI DSS 3.3.1 forbids retaining Sensitive Authentication Data,
+            // and the property shape PropertyNormalizer would write keeps the encrypted CVC.
+            new CvcNormalizer,
             new BackedEnumNormalizer,
             new DateTimeNormalizer,
             new ArrayDenormalizer,

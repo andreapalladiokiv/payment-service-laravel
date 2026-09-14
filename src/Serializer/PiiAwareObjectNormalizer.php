@@ -21,18 +21,24 @@ use Techork\PaymentService\Common\Pii;
 use Techork\PaymentService\Laravel\Shredding\PiiStore;
 
 /**
- * PII layer over symfony's ObjectNormalizer.
+ * PII layer over symfony's {@see PropertyNormalizer}.
  *
  * Strategy: composition, not inheritance — actual object (de)normalization is delegated
- * to a wrapped {@see ObjectNormalizer}; this class only adds the PII envelope wrap/unwrap.
+ * to a wrapped {@see PropertyNormalizer}; this class only adds the PII envelope wrap/unwrap.
  *
- *  - on normalize: ObjectNormalizer reduces the object to an array (Stringable VOs become
- *    strings via JsonSerializableNormalizer, enums via BackedEnumNormalizer, etc.); we
- *    then look up `#[Pii]`-marked attributes for the class via
+ *  - on normalize: {@see PropertyNormalizer} reduces the object to its **property** shape —
+ *    it reflects over private state, and enums are handled by {@see BackedEnumNormalizer}.
+ *    `JsonSerializableNormalizer` is deliberately absent from the chain
+ *    ({@see PayloadSerializerFactory} says why), so `jsonSerialize()` does not run and a
+ *    value object's own masking is not a defence here. This class therefore guards only what
+ *    is marked `#[Pii]`: it looks up those attributes via
  *    {@see ClassMetadataFactoryInterface} (populated by {@see PiiAttributeLoader}) and
- *    replace their values with `{__pii, hash, stub}` envelopes.
+ *    replaces their values with `{__pii, hash, stub}` envelopes. Anything a value object
+ *    keeps in private state and does *not* mark `#[Pii]` is written to the payload as it
+ *    stands — which is why sensitive-but-not-personal fields need a normalizer of their own
+ *    ({@see CvcNormalizer}).
  *  - on denormalize: same lookup, replace each envelope with either the retrieved
- *    plaintext or the stub, hand the cleaned array to ObjectNormalizer.
+ *    plaintext or the stub, hand the cleaned array to {@see PropertyNormalizer}.
  *
  * Per-property storage form is decided by the property's declared type:
  *  - `string`-typed properties → value stored verbatim.
