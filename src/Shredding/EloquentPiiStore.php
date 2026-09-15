@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Techork\PaymentService\Laravel\Shredding;
 
+use Illuminate\Database\UniqueConstraintViolationException;
 use Override;
 use Techork\PaymentService\Laravel\Models\ShreddingValue;
 
@@ -37,7 +38,11 @@ final class EloquentPiiStore implements PiiStore
             return $hash;
         }
 
-        $hash = ShreddingValue::query()->createOrFirst(['value' => $plaintext])->hash;
+        try {
+            $hash = ShreddingValue::query()->create(['value' => $plaintext])->hash;
+        } catch (UniqueConstraintViolationException) {
+            // Nothing, hash is already present
+        }
         $this->cache[$hash] = $plaintext;
 
         return $hash;
